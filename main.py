@@ -42,7 +42,7 @@ if __name__ == "__main__":
         height=800,
     )
 
-    webview.start()  # Start the webview
+    webview.start(gui='edgechromium')  # Start the webview
 
     # Terminate the Uvicorn server process after webview is closed
     uvicorn_process.terminate()

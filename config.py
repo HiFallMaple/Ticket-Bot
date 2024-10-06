@@ -8,6 +8,7 @@ from utils import get_project_dir
 
 
 STORE_KEY = [
+    "CHROME_PROFILE_DIR_PATH",
     "TARGET_TIME_STR",
     "NOTIFY_PREFIX",
     "SUCCESS_MESSAGE",
@@ -25,6 +26,7 @@ STORE_KEY = [
 class Config(TypedDict):
     CHROME_DRIVER_PATH: str
     CHROME_USER_DIR_PATH: str
+    CHROME_PROFILE_DIR_PATH: str
     SELENIUM_WAIT_TIMEOUT: int
     NOTIFY_PREFIX: str
     SUCCESS_MESSAGE: str

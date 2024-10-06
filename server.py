@@ -91,6 +91,7 @@ async def get_config():
 @app.put("/api/config", response_model=ConfigSchema)
 async def update_config(config: ConfigSchema):
     for key, value in config:
+        print(key, value)
         if value is not None:
             CONFIG[key] = value
     save_config()

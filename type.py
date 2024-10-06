@@ -23,6 +23,7 @@ class BrowserDriver:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--log-level=3")
+        options.add_argument(f"--profile-directory={CONFIG['CHROME_PROFILE_DIR_PATH']}")
         self.driver = webdriver.Chrome(service=service, options=options)
 
 
@@ -101,6 +102,7 @@ class BotStatus(BaseModel):
 
 
 class ConfigSchema(BaseModel):
+    CHROME_PROFILE_DIR_PATH: Optional[str] = None
     NOTIFY_PREFIX: Optional[str] = None
     SUCCESS_MESSAGE: Optional[str] = None
     TG_TOKEN: Optional[str] = None

@@ -62,6 +62,12 @@
         <ToggleSwitch v-model="TRY_AGAIN_WHEN_ERROR" />
       </div>
       <Label_InputText
+        v-model="CHROME_PROFILE_DIR_PATH"
+        label="Chrome Profile 目錄"
+        placeholder="Default"
+        inputId="chrome_profile_dir"
+      />
+      <Label_InputText
         v-model="NOTIFY_PREFIX"
         label="通知前綴"
         placeholder="Tony"
@@ -109,6 +115,7 @@ import ToggleSwitch from "primevue/toggleswitch";
 import axios from "axios"; // 引入 axios
 
 const setting_visible = ref(false);
+const CHROME_PROFILE_DIR_PATH = ref(null);
 const NOTIFY_PREFIX = ref(null);
 const SUCCESS_MESSAGE = ref(null);
 const TG_TOKEN = ref(null);
@@ -136,6 +143,7 @@ const getSettings = async () => {
     const config = response.data;
 
     // 將 API 返回的數據賦值給對應的變數
+    CHROME_PROFILE_DIR_PATH.value = config.CHROME_PROFILE_DIR_PATH;
     NOTIFY_PREFIX.value = config.NOTIFY_PREFIX;
     SUCCESS_MESSAGE.value = config.SUCCESS_MESSAGE;
     TG_TOKEN.value = config.TG_TOKEN;
@@ -154,6 +162,7 @@ const getSettings = async () => {
 // 當對話框隱藏時記錄設置
 const updateSetting = async () => {
   const settings = {
+    CHROME_PROFILE_DIR_PATH: CHROME_PROFILE_DIR_PATH.value,
     NOTIFY_PREFIX: NOTIFY_PREFIX.value,
     SUCCESS_MESSAGE: SUCCESS_MESSAGE.value,
     TG_TOKEN: TG_TOKEN.value,
@@ -161,6 +170,7 @@ const updateSetting = async () => {
     LINE_NOTIFY_TOKEN: LINE_NOTIFY_TOKEN.value,
     TRY_AGAIN_WHEN_ERROR: TRY_AGAIN_WHEN_ERROR.value,
   };
+  console.log("Settings to update:", settings);
 
   try {
     const response = await axios.put("/api/config", settings);
