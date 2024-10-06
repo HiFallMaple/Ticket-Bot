@@ -1,0 +1,16 @@
+test.py
+test.html
+output.svg
+account.json
+*.exe
+.vscode/
+__pycache__/
+venv/
+*.jpg
+*.png
+.env
+config.json
+build/
+dist/
+*.spec
+screenshots/

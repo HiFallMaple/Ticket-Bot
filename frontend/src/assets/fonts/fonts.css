@@ -1,0 +1,13 @@
+@font-face {
+    font-family: 'SuperCaramel';
+    src: url('./SuperCaramel.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'MouldyCheeseRegular';
+    src: url('./MouldyCheeseRegular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
