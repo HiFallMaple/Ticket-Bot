@@ -6,12 +6,13 @@ import Divider from "primevue/divider";
 import Button from "primevue/button";
 import DatePicker from "primevue/datepicker";
 import { useToast } from "primevue/usetoast";
+import { useConfirm } from "primevue/useconfirm";
 import axios from "axios"; // 引入 axios
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router"; // 引入 vue-router 用來跳轉頁面
 import Toast from "primevue/toast";
-import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
+import ToggleSwitch from "primevue/toggleswitch";
 
 const confirm = useConfirm();
 const toast = useToast();
@@ -22,6 +23,8 @@ const TIXCRAFT_SESSION_INDEX_LIST = ref([]); // 用於記錄選中的項目
 const KEYWORD_LIST = ref(""); // 記錄輸入的關鍵字
 const TIXCRAFT_EVENT_URL = ref(null);
 const TARGET_TIME_STR = ref(null);
+const AUTO_LOGIN = ref(false);
+
 const keyword_list_str = ref(null);
 const target_time = ref(null);
 const target_time_s = ref(null);
@@ -101,6 +104,7 @@ const saveData = async () => {
     REQUEST_TICKETS: REQUEST_TICKETS.value,
     TIXCRAFT_SESSION_INDEX_LIST: TIXCRAFT_SESSION_INDEX_LIST.value,
     KEYWORD_LIST: KEYWORD_LIST.value,
+    AUTO_LOGIN: AUTO_LOGIN.value,
     TIXCRAFT_EVENT_URL: TIXCRAFT_EVENT_URL.value,
     TARGET_TIME_STR: TARGET_TIME_STR.value,
   };
@@ -125,9 +129,11 @@ onMounted(async () => {
     const config = response.data;
     REQUEST_TICKETS.value = config.REQUEST_TICKETS;
     TIXCRAFT_SESSION_INDEX_LIST.value = config.TIXCRAFT_SESSION_INDEX_LIST;
-    keyword_list_str.value = config.KEYWORD_LIST.join(",");
     TIXCRAFT_EVENT_URL.value = config.TIXCRAFT_EVENT_URL;
     TARGET_TIME_STR.value = config.TARGET_TIME_STR;
+    AUTO_LOGIN.value = config.AUTO_LOGIN;
+
+    keyword_list_str.value = config.KEYWORD_LIST.join(",");
     target_time.value = new Date(config.TARGET_TIME_STR.substring(0, 16));
     target_time_s.value = parseInt(
       config.TARGET_TIME_STR.substring(17, 19),
@@ -190,6 +196,11 @@ const comfirmToStart = () => {
         </div>
       </div>
       <Divider />
+      <div class="flex flex-column">
+        <h3>自動登入</h3>
+        <small class="-mt-2 mb-2">使用 Google 第一個帳號</small>
+        <ToggleSwitch v-model="AUTO_LOGIN" />
+      </div>
       <div class="grid">
         <div class="grid grid-nogutter col-6">
           <h3 class="col-12">搶購時間</h3>

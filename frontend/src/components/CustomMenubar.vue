@@ -115,6 +115,7 @@ import ToggleSwitch from "primevue/toggleswitch";
 import axios from "axios"; // 引入 axios
 
 const setting_visible = ref(false);
+
 const CHROME_PROFILE_DIR_PATH = ref(null);
 const NOTIFY_PREFIX = ref(null);
 const SUCCESS_MESSAGE = ref(null);

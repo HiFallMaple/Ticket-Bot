@@ -2,10 +2,11 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from multiprocessing import Process, Queue
+from multiprocessing import Event, Process, Queue
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.websockets import WebSocketState
 
 from config import CONFIG, FRONTEND_PATH, get_stored_config, load_config, save_config
 from type import ActionRequest, BotStatus, ProgramStatusEnum, ConfigSchema, SessionInfo
@@ -21,6 +22,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 process = None
+# multiprocessing event
+wait_event = Event()
 log_queue = Queue()
 
 # Store all connected WebSocket clients
@@ -37,6 +40,9 @@ async def send_logs():
         for websocket in connected_websockets:
             try:
                 await websocket.send_text(logs)
+                # await websocket.send_text("Event: confirm_login")
+                # print("Event: confirm_login")
+                # await asyncio.sleep(5)
             except Exception as e:
                 print(f"Error sending log to websocket: {e}")
 
@@ -53,16 +59,17 @@ async def websocket_logs(websocket: WebSocket):
         print("WebSocket disconnected")
     finally:
         connected_websockets.remove(websocket)  # Remove from the connected list
-        await websocket.close()  # Attempt to close the WebSocket
+        if not WebSocketState.DISCONNECTED:
+            await websocket.close()  # Attempt to close the WebSocket
 
 
 @app.put("/api/bot/tixcraft", response_model=BotStatus)
 async def control_tixcraft_bot(action_request: ActionRequest):
-    global process
+    global process, wait_event
 
     if action_request.action == "run":
         if not process or not process.is_alive():
-            process = Process(target=tixcraft.main, args=(log_queue,))
+            process = Process(target=tixcraft.main, args=(log_queue, wait_event))
             process.start()
         return BotStatus(status=ProgramStatusEnum.RUNNING)
 
@@ -71,6 +78,14 @@ async def control_tixcraft_bot(action_request: ActionRequest):
             process.terminate()
             process.join()
         return BotStatus(status=ProgramStatusEnum.STOPPED)
+    
+    elif action_request.action == "continue":
+        if not process or not process.is_alive():
+            wait_event.set()
+            return BotStatus(status=ProgramStatusEnum.RUNNING)
+        else:
+            return BotStatus(status=ProgramStatusEnum.STOPPED)
+
 
 
 @app.get("/api/bot/tixcraft", response_model=BotStatus)
@@ -91,7 +106,6 @@ async def get_config():
 @app.put("/api/config", response_model=ConfigSchema)
 async def update_config(config: ConfigSchema):
     for key, value in config:
-        print(key, value)
         if value is not None:
             CONFIG[key] = value
     save_config()
@@ -111,9 +125,6 @@ async def catch_all(request: Request, full_path: str):
     if not full_path:
         full_path = "index.html"
     file_path = os.path.join(FRONTEND_PATH, full_path)
-    print("full_path", full_path)
-    print("file_path", file_path)
-    print("exists", os.path.exists(file_path))
     if os.path.exists(file_path):
         print("return file")
         return FileResponse(file_path)

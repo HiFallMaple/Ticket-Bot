@@ -1,4 +1,19 @@
 <template>
+  <!-- <ConfirmDialog></ConfirmDialog> -->
+  <ConfirmDialog group="headless">
+    <template #container="{ message, acceptCallback, rejectCallback }">
+      <div class="p-3 px-6 bg-surface-0 dark:bg-surface-900 rounded">
+        <p class="mb-0 text-lg mt-4">{{ message.message }}</p>
+        <div class="flex items-center justify-content-center pt-4 pb-0">
+          <Button
+            :label="message.acceptProps.label"
+            @click="acceptCallback"
+            class="w-32"
+          ></Button>
+        </div>
+      </div>
+    </template>
+  </ConfirmDialog>
   <div class="grid max-w-full">
     <div class="lg:col-10 lg:col-offset-1 col-12">
       <div class="flex">
@@ -9,7 +24,7 @@
           class="my-auto ml-auto"
           severity="danger"
           label="關閉腳本"
-          @click="stopBot"
+          @click="confirmLogin"
         />
       </div>
       <div
@@ -27,13 +42,42 @@
 import Button from "primevue/button";
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import axios from "axios"; // 引入 axios
+import { useConfirm } from "primevue/useconfirm";
+import ConfirmDialog from "primevue/confirmdialog";
 
+const confirm = useConfirm();
 const logs = ref([]); // 用來存儲接收到的日誌
 const MAX_LOGS = 200; // 日誌的最大條數限制
 let websocket = null; // 定義 WebSocket 對象
 const logContainer = ref(null); // 用來引用 logs 容器
 const reconnectInterval = 3000; // 斷線後重連的時間間隔（3秒）
 const isLoading = ref(false); // 新增一個狀態變量來控制圖示
+
+const confirmLogin = () => {
+  confirm.require({
+    group: "headless",
+    message: "請登入後再按下確認繼續腳本",
+    header: "登入",
+    icon: "pi pi-exclamation-triangle",
+    acceptProps: {
+      label: "繼續",
+    },
+    accept: () => {
+      continueBot();
+    },
+  });
+};
+
+const continueBot = async () => {
+  try {
+    const response = await axios.put("/api/bot/tixcraft", {
+      action: "continue",
+    });
+    console.log("腳本已繼續", response.data);
+  } catch (error) {
+    console.error("繼續腳本時發生錯誤:", error);
+  }
+};
 
 // 建立 WebSocket 連接的函數
 const connectWebSocket = () => {
@@ -44,17 +88,24 @@ const connectWebSocket = () => {
   };
 
   websocket.onmessage = (event) => {
-    // 將新的日誌添加到 logs 並限制總數不超過 200 條
-    logs.value.push(event.data);
-    if (logs.value.length > MAX_LOGS) {
-      logs.value.shift(); // 移除最早的一條日誌
-    }
-    // 確保 DOM 更新後滾動條移動到底部
-    nextTick(() => {
-      if (logContainer.value) {
-        logContainer.value.scrollTop = logContainer.value.scrollHeight;
+    const message = event.data;
+
+    // 如果 message 以 "Event:" 開頭，則解析事件
+    if (message.includes("WARNING - confirm_login")) {
+      confirmLogin(); // 如果訊息包含 WARNING - confirm_login，則調用 confirmLogin
+    } else {
+      // 將新的日誌添加到 logs 並限制總數不超過 200 條
+      logs.value.push(message);
+      if (logs.value.length > MAX_LOGS) {
+        logs.value.shift(); // 移除最早的一條日誌
       }
-    });
+      // 確保 DOM 更新後滾動條移動到底部
+      nextTick(() => {
+        if (logContainer.value) {
+          logContainer.value.scrollTop = logContainer.value.scrollHeight;
+        }
+      });
+    }
   };
 
   websocket.onclose = () => {

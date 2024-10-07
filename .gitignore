@@ -17,3 +17,6 @@ screenshots/
 main.build/
 main.dist/
 package/
+*.WebView2
+*.xml
+*.zip

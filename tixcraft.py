@@ -31,6 +31,7 @@ class TicketSoldOutError(Exception):
 class Tixcraft(BrowserDriver):
     def __init__(
         self,
+        wait_event: multiprocessing.Event,
         log_handler: logging.StreamHandler,
         event_url: str,
         session_index_list: list[int] = None,
@@ -38,6 +39,7 @@ class Tixcraft(BrowserDriver):
         requested_tickets: int = 1,
     ):
         super().__init__()
+        self.wait_event = wait_event
         self.event_url = event_url
         self.keyword_list = init_list(keyword_list)
         self.requested_tickets = requested_tickets
@@ -56,6 +58,13 @@ class Tixcraft(BrowserDriver):
         return logger
 
     def login(self):
+        if not CONFIG["AUTO_LOGIN"]:
+            self.driver.get(self.event_url)
+            self.logger.warning("confirm_login")
+            self.wait_event.wait()
+            self.wait_event.clear()
+            return
+        
         self.driver.get(self.LOGIN_URL)
         WebDriverWait(self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]).until(
             lambda driver: driver.execute_script("return document.readyState")
@@ -252,33 +261,34 @@ class Tixcraft(BrowserDriver):
             self.driver.refresh()
         return not CONFIG["TRY_AGAIN_WHEN_ERROR"]
 
-    def start(self, stop_event):
+    def start(self):
         while not self.loop():
             pass
         self.logger.info("腳本結束，等待手動關閉...")
-        stop_event.wait()
+        self.wait_event.wait()
 
 
-def main(log_queue=None, stop_event=None):
+def main(log_queue=None, wait_event=None):
     if log_queue:
         log_handler = QueueHandler(log_queue)
     else:
         log_handler = logging.StreamHandler(sys.stdout)
 
-    if not stop_event:
-        stop_event = multiprocessing.Event()
+    if not wait_event:
+        wait_event = multiprocessing.Event()
 
     formatter = logging.Formatter("%(asctime)s - :%(levelname)s - %(message)s")
     log_handler.setFormatter(formatter)
 
     ticket_bot = Tixcraft(
+        wait_event=wait_event,
         log_handler=log_handler,
         event_url=CONFIG["TIXCRAFT_EVENT_URL"],
         session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
         keyword_list=CONFIG["KEYWORD_LIST"],
         requested_tickets=CONFIG["REQUEST_TICKETS"],
     )
-    ticket_bot.start(stop_event)
+    ticket_bot.start()
 
 
 if __name__ == "__main__":

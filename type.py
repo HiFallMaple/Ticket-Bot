@@ -89,7 +89,7 @@ class QueueHandler(logging.Handler):
 
 
 class ActionRequest(BaseModel):
-    action: Literal["run", "stop"]
+    action: Literal["run", "stop", "continue"]
 
 
 class ProgramStatusEnum(Enum):
@@ -103,6 +103,7 @@ class BotStatus(BaseModel):
 
 class ConfigSchema(BaseModel):
     CHROME_PROFILE_DIR_PATH: Optional[str] = None
+    AUTO_LOGIN: Optional[bool] = None
     NOTIFY_PREFIX: Optional[str] = None
     SUCCESS_MESSAGE: Optional[str] = None
     TG_TOKEN: Optional[str] = None
