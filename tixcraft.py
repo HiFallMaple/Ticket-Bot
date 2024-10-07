@@ -64,7 +64,7 @@ class Tixcraft(BrowserDriver):
             self.wait_event.wait()
             self.wait_event.clear()
             return
-        
+
         self.driver.get(self.LOGIN_URL)
         WebDriverWait(self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]).until(
             lambda driver: driver.execute_script("return document.readyState")
@@ -238,32 +238,52 @@ class Tixcraft(BrowserDriver):
 
     def check_all_events_and_purchase_tickets(self):
         for event_url in self.session_url_list:
-            if self.find_available_ticket(event_url):
-                self.fill_ticket_form()
-                self.notify.send(
-                    f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
-                    CONFIG["TICKET_DETAIL_IMG_PATH"],
-                )
-                return True
+            if not self.find_available_ticket(event_url):
+                continue
+
+            self.fill_ticket_form()
+            self.notify.send(
+                f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
+                CONFIG["TICKET_DETAIL_IMG_PATH"],
+            )
+            return True
         return False
 
-    def loop(self):
-        try:
-            self.login()
-            countdown(CONFIG["TARGET_TIME"], self.logger)
-            while True:
-                self.refresh_session_links()
-                if self.check_all_events_and_purchase_tickets():
-                    return True
-                self.logger.info("無可購票區域，重新嘗試...")
-        except Exception:
-            self.logger.error(traceback.format_exc())
-            self.driver.refresh()
-        return not CONFIG["TRY_AGAIN_WHEN_ERROR"]
+    def purchase(self):
+        self.refresh_session_links()
+        for event_url in self.session_url_list:
+            if not self.find_available_ticket(event_url):
+                continue
 
-    def start(self):
-        while not self.loop():
-            pass
+            self.fill_ticket_form()
+            self.notify.send(
+                f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
+                CONFIG["TICKET_DETAIL_IMG_PATH"],
+            )
+            return True
+        return False
+
+    def run(self):
+        """
+        infinite loop until tickets are purchased
+        if error occurs:
+            TRY_AGAIN_WHEN_ERROR=True: re-login and try again
+            TRY_AGAIN_WHEN_ERROR=False: end infinite loop
+        """
+        self.login()
+        countdown(CONFIG["TARGET_TIME"], self.logger)
+        while True:
+            try:
+                if self.purchase():
+                    break
+                else:
+                    self.logger.info("無可購票區域，重新嘗試...")
+            except Exception:
+                self.logger.error(traceback.format_exc())
+                if CONFIG["TRY_AGAIN_WHEN_ERROR"]:
+                    self.login()
+                else:
+                    break
         self.logger.info("腳本結束，等待手動關閉...")
         self.wait_event.wait()
 
@@ -288,7 +308,7 @@ def main(log_queue=None, wait_event=None):
         keyword_list=CONFIG["KEYWORD_LIST"],
         requested_tickets=CONFIG["REQUEST_TICKETS"],
     )
-    ticket_bot.start()
+    ticket_bot.run()
 
 
 if __name__ == "__main__":
