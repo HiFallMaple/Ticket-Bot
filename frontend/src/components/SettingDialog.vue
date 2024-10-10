@@ -114,7 +114,7 @@ const updateSetting = async () => {
   try {
     const response = await axios.put("/api/config", settings);
     console.log("Settings updated successfully:", response.data);
-    setting_visible.value = false; // 關閉對話框
+    visible.value = false; // 關閉對話框
   } catch (error) {
     console.error("Error updating settings:", error);
   }

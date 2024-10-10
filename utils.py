@@ -1,7 +1,6 @@
 import ctypes
 import logging
 import os
-from re import S
 import threading
 import time
 import base64
@@ -10,6 +9,7 @@ from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import undetected_chromedriver as uc
 
 
 def countdown(target_time: datetime, logger: logging.Logger | None = None) -> None:
@@ -121,3 +121,22 @@ def raise_SystemExit_in_thread(thread: threading.Thread) -> None:
     ctypes.pythonapi.PyThreadState_SetAsyncExc(
         ctypes.c_long(thread_id), ctypes.py_object(SystemExit)
     )
+
+
+def get_webdriver(user_data_dir: str = None, profile_dir: str = None):
+    print("user_data_dir:", user_data_dir)
+    print("profile_dir:", profile_dir)
+    options = uc.ChromeOptions()
+    if profile_dir:
+        options.add_argument(f"--profile-directory={profile_dir}")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--log-level=3")
+    options.add_experimental_option("debuggerAddress", "127.0.0.1:9111")
+    driver = uc.Chrome(
+        user_data_dir=user_data_dir,
+        use_subprocess=False,
+        options=options,
+    )
+    driver.maximize_window()
+    return driver

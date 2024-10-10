@@ -26,8 +26,6 @@ STORE_KEY = [
 
 
 class Config(TypedDict):
-    CHROME_DRIVER_PATH: str
-    CHROME_USER_DIR_PATH: str
     CHROME_PROFILE_DIR_PATH: str
     SELENIUM_WAIT_TIMEOUT: int
     AUTO_LOGIN: bool
@@ -51,6 +49,7 @@ class Config(TypedDict):
 
 PROJ_DIR = get_project_dir()
 FRONTEND_PATH = os.path.join(PROJ_DIR, "frontend", "dist")
+CHROME_USER_DATA_PATH = os.path.join(PROJ_DIR, "chrome_user_data")
 
 def load_config():
     with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
@@ -77,12 +76,7 @@ CONFIG = Config()
 load_config()
 
 
-CONFIG["CHROME_DRIVER_PATH"] = os.path.join(PROJ_DIR, "chromedriver.exe")
-CONFIG["CHROME_USER_DIR_PATH"] = (
-    f"C:\\Users\\{getpass.getuser()}\\AppData\\Local\\Google\\Chrome\\User Data"
-)
 CONFIG["SELENIUM_WAIT_TIMEOUT"] = 10
-
 CONFIG["TARGET_TIME"] = datetime.strptime(
     CONFIG["TARGET_TIME_STR"], "%Y/%m/%d %H:%M:%S.%f"
 )

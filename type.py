@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import multiprocessing
 import os
 from enum import Enum
 import threading
@@ -8,34 +6,15 @@ from typing import Literal, Optional
 
 import requests
 from pydantic import BaseModel
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-import undetected_chromedriver as uc
+
 from telegram import Bot, InputFile
 from telegram.error import TelegramError
 
 from config import CONFIG
 
 
-class BrowserDriver:
-    def __init__(self):
-        service = Service(executable_path=CONFIG["CHROME_DRIVER_PATH"])
-        options = uc.ChromeOptions()
-        options.user_data_dir = CONFIG["CHROME_USER_DIR_PATH"]
-        # options = webdriver.ChromeOptions()
-        # options.add_argument(f"user-data-dir={CONFIG["CHROME_USER_DIR_PATH"]}")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--log-level=3")
-        options.add_argument(f"--profile-directory={CONFIG['CHROME_PROFILE_DIR_PATH']}")
-        options.add_experimental_option("debuggerAddress", "127.0.0.1:9111")
-        self.driver = uc.Chrome(
-            use_subprocess=False,
-            service=service,
-            options=options,
-        )
-        self.driver.maximize_window()
-        # self.driver = webdriver.Chrome(options=options)
+class TicketSoldOutError(Exception):
+    pass
 
 
 class Notify:
@@ -87,7 +66,6 @@ class Notify:
         else:
             print(f"Failed to send message. Status code: {response.status_code}")
             print(response.text)
-
 
 
 class ProgramStatusEnum(Enum):

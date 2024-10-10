@@ -20,3 +20,4 @@ package/
 *.WebView2
 *.xml
 *.zip
+chrome_user_data
