@@ -1,6 +1,7 @@
 <script setup>
 import TicketDataTable from "@/components/TicketDataTable.vue";
-import Label_InputText from "@/components/Label_InputText.vue";
+import LabelInputText from "@/components/LabelInputText.vue";
+import LabelToggleSwitch from "@/components/LabelToggleSwitch.vue"; // 引入新組件
 import InputNumber from "primevue/inputnumber";
 import Divider from "primevue/divider";
 import Button from "primevue/button";
@@ -12,7 +13,6 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router"; // 引入 vue-router 用來跳轉頁面
 import Toast from "primevue/toast";
 import ConfirmDialog from "primevue/confirmdialog";
-import ToggleSwitch from "primevue/toggleswitch";
 
 const confirm = useConfirm();
 const toast = useToast();
@@ -24,6 +24,7 @@ const KEYWORD_LIST = ref(""); // 記錄輸入的關鍵字
 const TIXCRAFT_EVENT_URL = ref(null);
 const TARGET_TIME_STR = ref(null);
 const AUTO_LOGIN = ref(false);
+const AUTO_INPUT_CAPTCHA = ref(false);
 
 const keyword_list_str = ref(null);
 const target_time = ref(null);
@@ -107,6 +108,7 @@ const saveData = async () => {
     AUTO_LOGIN: AUTO_LOGIN.value,
     TIXCRAFT_EVENT_URL: TIXCRAFT_EVENT_URL.value,
     TARGET_TIME_STR: TARGET_TIME_STR.value,
+    AUTO_INPUT_CAPTCHA: AUTO_INPUT_CAPTCHA.value,
   };
   try {
     const response = await axios.put("/api/config", config);
@@ -129,9 +131,11 @@ onMounted(async () => {
     const config = response.data;
     REQUEST_TICKETS.value = config.REQUEST_TICKETS;
     TIXCRAFT_SESSION_INDEX_LIST.value = config.TIXCRAFT_SESSION_INDEX_LIST;
+    console.log("TIXCRAFT_SESSION_INDEX_LIST", TIXCRAFT_SESSION_INDEX_LIST.value);
     TIXCRAFT_EVENT_URL.value = config.TIXCRAFT_EVENT_URL;
     TARGET_TIME_STR.value = config.TARGET_TIME_STR;
     AUTO_LOGIN.value = config.AUTO_LOGIN;
+    AUTO_INPUT_CAPTCHA.value = config.AUTO_INPUT_CAPTCHA;
 
     keyword_list_str.value = config.KEYWORD_LIST.join(",");
     target_time.value = new Date(config.TARGET_TIME_STR.substring(0, 16));
@@ -147,6 +151,7 @@ onMounted(async () => {
 
 const comfirmToStart = () => {
   confirm.require({
+    group: "headless",
     message: "要開始搶票嗎？",
     header: " ",
     icon: "pi pi-exclamation-triangle",
@@ -161,13 +166,35 @@ const comfirmToStart = () => {
     accept: () => {
       startPurchase();
     },
+    reject: () => {
+    },
   });
 };
 </script>
 
 <template>
   <Toast />
-  <ConfirmDialog></ConfirmDialog>
+  <ConfirmDialog group="headless">
+    <template #container="{ message, acceptCallback, rejectCallback }">
+      <div class="p-3 px-6 bg-surface-0 dark:bg-surface-900 rounded">
+        <p class="mb-0 text-lg text-center mt-4">{{ message.message }}</p>
+        <div class="flex items-center justify-content-center pt-4 pb-0">
+          <Button
+            :label="message.rejectProps.label"
+            @click="rejectCallback"
+            class="w-32 mr-2"
+            severity="secondary"
+          ></Button>
+          <Button
+            :label="message.acceptProps.label"
+            @click="acceptCallback"
+            class="w-32"
+          ></Button>
+        </div>
+      </div>
+    </template>
+  </ConfirmDialog>
+
   <div class="grid max-w-full mt-2 mb-4">
     <div class="col-12 lg:col-10 lg:col-offset-1 lg:px-0 px-4">
       <div class="flex justify-content-between align-content-center">
@@ -196,11 +223,16 @@ const comfirmToStart = () => {
         </div>
       </div>
       <Divider />
-      <div class="flex flex-column">
-        <h3>自動登入</h3>
-        <small class="-mt-2 mb-2">使用 Google 第一個帳號</small>
-        <ToggleSwitch v-model="AUTO_LOGIN" />
-      </div>
+      <LabelToggleSwitch
+        v-model="AUTO_LOGIN"
+        label="自動登入"
+        helpText="使用 Google 第一個帳號"
+      />
+      <LabelToggleSwitch
+        v-model="AUTO_INPUT_CAPTCHA"
+        label="自動輸入驗證碼"
+        helpText="使用 ddddocr 辨識，可能有錯誤"
+      />
       <div class="grid">
         <div class="grid grid-nogutter col-6">
           <h3 class="col-12">搶購時間</h3>
@@ -252,7 +284,7 @@ const comfirmToStart = () => {
             fluid
           />
         </div>
-        <Label_InputText
+        <LabelInputText
           v-model="keyword_list_str"
           label="搶購的關鍵字"
           placeholder="1F,3080,5505"
@@ -260,17 +292,18 @@ const comfirmToStart = () => {
           class="col-3"
         />
         <div class="col-6"></div>
-        <Label_InputText
+        <LabelInputText
           v-model="TIXCRAFT_EVENT_URL"
           label="購票網址"
           placeholder="https://tixcraft.com/activity/game/25_mogwaitp"
           inputId="event-url"
-          class="col-7"
+          class="col-6"
           helpText="請將網址中 detail 改為 game"
         />
       </div>
       <TicketDataTable
         class="-mx-2 my-2"
+        :eventURL=TIXCRAFT_EVENT_URL
         v-model:selectedIndex="TIXCRAFT_SESSION_INDEX_LIST"
       />
     </div>

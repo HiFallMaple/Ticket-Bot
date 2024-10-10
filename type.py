@@ -3,12 +3,14 @@ import logging
 import multiprocessing
 import os
 from enum import Enum
+import threading
 from typing import Literal, Optional
 
 import requests
 from pydantic import BaseModel
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+import undetected_chromedriver as uc
 from telegram import Bot, InputFile
 from telegram.error import TelegramError
 
@@ -18,13 +20,22 @@ from config import CONFIG
 class BrowserDriver:
     def __init__(self):
         service = Service(executable_path=CONFIG["CHROME_DRIVER_PATH"])
-        options = webdriver.ChromeOptions()
-        options.add_argument(f"user-data-dir={CONFIG["CHROME_USER_DIR_PATH"]}")
+        options = uc.ChromeOptions()
+        options.user_data_dir = CONFIG["CHROME_USER_DIR_PATH"]
+        # options = webdriver.ChromeOptions()
+        # options.add_argument(f"user-data-dir={CONFIG["CHROME_USER_DIR_PATH"]}")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--log-level=3")
         options.add_argument(f"--profile-directory={CONFIG['CHROME_PROFILE_DIR_PATH']}")
-        self.driver = webdriver.Chrome(service=service, options=options)
+        options.add_experimental_option("debuggerAddress", "127.0.0.1:9111")
+        self.driver = uc.Chrome(
+            use_subprocess=False,
+            service=service,
+            options=options,
+        )
+        self.driver.maximize_window()
+        # self.driver = webdriver.Chrome(options=options)
 
 
 class Notify:
@@ -78,23 +89,16 @@ class Notify:
             print(response.text)
 
 
-class QueueHandler(logging.Handler):
-    def __init__(self, queue: multiprocessing.Queue):
-        super().__init__()
-        self.queue: multiprocessing.Queue = queue
-
-    def emit(self, record):
-        msg = self.format(record)
-        self.queue.put(msg)
-
-
-class ActionRequest(BaseModel):
-    action: Literal["run", "stop", "continue"]
-
 
 class ProgramStatusEnum(Enum):
     RUNNING = "running"
+    PAUSED = "paused"
+    ENDED = "ended"
     STOPPED = "stopped"
+
+
+class ActionRequest(BaseModel):
+    action: Literal["run", "stop", "pause", "continue"]
 
 
 class BotStatus(BaseModel):
@@ -104,6 +108,7 @@ class BotStatus(BaseModel):
 class ConfigSchema(BaseModel):
     CHROME_PROFILE_DIR_PATH: Optional[str] = None
     AUTO_LOGIN: Optional[bool] = None
+    AUTO_INPUT_CAPTCHA: Optional[bool] = None
     NOTIFY_PREFIX: Optional[str] = None
     SUCCESS_MESSAGE: Optional[str] = None
     TG_TOKEN: Optional[str] = None
@@ -123,3 +128,20 @@ class SessionInfo(BaseModel):
     venue: str
     purchase_status: str
     id: int
+
+
+class DummyEvent(threading.Event):
+    def __init__(self):
+        pass
+
+    def set(self):
+        pass
+
+    def clear(self):
+        pass
+
+    def wait(self, timeout=None):
+        input("Press Enter to continue...")
+
+    def is_set(self):
+        return False

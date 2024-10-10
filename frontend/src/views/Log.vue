@@ -1,5 +1,4 @@
 <template>
-  <!-- <ConfirmDialog></ConfirmDialog> -->
   <ConfirmDialog group="headless">
     <template #container="{ message, acceptCallback, rejectCallback }">
       <div class="p-3 px-6 bg-surface-0 dark:bg-surface-900 rounded">
@@ -14,19 +13,44 @@
       </div>
     </template>
   </ConfirmDialog>
+
   <div class="grid max-w-full">
     <div class="lg:col-10 lg:col-offset-1 col-12">
       <div class="flex">
         <h2>實時日誌</h2>
-        <Button
-          :icon="isLoading ? 'pi pi-spin pi-spinner' : 'pi pi-times'"
-          aria-label="關閉腳本"
-          class="my-auto ml-auto"
-          severity="danger"
-          label="關閉腳本"
-          @click="confirmLogin"
-        />
+        <div class="ml-auto flex">
+          <Button
+            v-if="status !== 'stopped'"
+            :label="status === 'running' ? '暫停腳本' : '繼續腳本'"
+            :icon="status === 'running' ? 'pi pi-pause' : 'pi pi-step-forward'"
+            class="my-auto"
+            severity="info"
+            @click="handleToggle"
+            :disabled="isLoading"
+          />
+          <Button
+            v-if="status !== 'stopped'"
+            :icon="isLoading ? 'pi pi-spin pi-spinner' : 'pi pi-times'"
+            aria-label="強制關閉"
+            class="my-auto ml-2"
+            severity="danger"
+            label="強制關閉"
+            @click="stopBot"
+            :disabled="isLoading"
+          />
+          <Button
+            v-if="status === 'stopped'"
+            icon="pi pi-home"
+            aria-label="回到首頁"
+            class="my-auto ml-2 no-underline"
+            label="回到首頁"
+            as="router-link"
+            to="/"
+            :disabled="isLoading"
+          />
+        </div>
       </div>
+
       <div
         class="logs overflow-y-auto border-solid border-400 border-1 mx-0"
         ref="logContainer"
@@ -48,11 +72,87 @@ import ConfirmDialog from "primevue/confirmdialog";
 const confirm = useConfirm();
 const logs = ref([]); // 用來存儲接收到的日誌
 const MAX_LOGS = 200; // 日誌的最大條數限制
-let websocket = null; // 定義 WebSocket 對象
 const logContainer = ref(null); // 用來引用 logs 容器
 const reconnectInterval = 3000; // 斷線後重連的時間間隔（3秒）
-const isLoading = ref(false); // 新增一個狀態變量來控制圖示
+const isLoading = ref(false); // 控制圖示
+const status = ref("stopped"); // 用來存儲腳本狀態
+let logWebSocket = null; // 定義 log WebSocket 對象
+let statusWebSocket = null; // 定義 status WebSocket 對象
 
+// handleToggle 定義
+const handleToggle = async () => {
+  isLoading.value = true;
+  let action = status.value === "running" ? "pause" : "continue";
+  try {
+    await axios.put("/api/bot/tixcraft", { action: action });
+  } catch (error) {
+    console.error("切換腳本狀態時發生錯誤:", error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// 公共的 WebSocket 連接邏輯，接收 URL 和事件回調
+const connectWebSocket = (url, onMessageCallback) => {
+  const websocket = new WebSocket(url);
+
+  websocket.onopen = () => {
+    console.log(`${url} WebSocket 連接已建立`);
+  };
+
+  websocket.onmessage = (event) => {
+    onMessageCallback(event.data);
+  };
+
+  websocket.onclose = () => {
+    console.log(`${url} WebSocket 連接已關閉，嘗試重新連接...`);
+    reconnectWebSocket(url, onMessageCallback);
+  };
+
+  websocket.onerror = (error) => {
+    console.error(`${url} WebSocket 發生錯誤:`, error);
+    websocket.close();
+  };
+
+  return websocket;
+};
+
+// 用於重新連接 WebSocket 的函數
+const reconnectWebSocket = (url, onMessageCallback) => {
+  setTimeout(() => {
+    if (url.includes("logs")) {
+      logWebSocket = connectWebSocket(url, onMessageCallback);
+    } else if (url.includes("status")) {
+      statusWebSocket = connectWebSocket(url, onMessageCallback);
+    }
+  }, reconnectInterval);
+};
+
+// log WebSocket 的回調
+const handleLogMessage = (message) => {
+  if (message.includes("WARNING - confirm_login")) {
+    confirmLogin();
+  } else {
+    logs.value.push(message);
+    if (logs.value.length > MAX_LOGS) {
+      logs.value.shift();
+    }
+    nextTick(() => {
+      if (logContainer.value) {
+        logContainer.value.scrollTop = logContainer.value.scrollHeight;
+      }
+    });
+  }
+};
+
+// status WebSocket 的回調
+const handleStatusMessage = (message) => {
+  status.value = message;
+  console.log("狀態更新為:", status.value);
+  // 可以根據需求處理狀態訊息
+};
+
+// 確認登入的對話框邏輯
 const confirmLogin = () => {
   confirm.require({
     group: "headless",
@@ -68,6 +168,7 @@ const confirmLogin = () => {
   });
 };
 
+// 繼續 Bot
 const continueBot = async () => {
   try {
     const response = await axios.put("/api/bot/tixcraft", {
@@ -79,77 +180,44 @@ const continueBot = async () => {
   }
 };
 
-// 建立 WebSocket 連接的函數
-const connectWebSocket = () => {
-  websocket = new WebSocket("/ws/logs");
-
-  websocket.onopen = () => {
-    console.log("WebSocket 連接已建立");
-  };
-
-  websocket.onmessage = (event) => {
-    const message = event.data;
-
-    // 如果 message 以 "Event:" 開頭，則解析事件
-    if (message.includes("WARNING - confirm_login")) {
-      confirmLogin(); // 如果訊息包含 WARNING - confirm_login，則調用 confirmLogin
-    } else {
-      // 將新的日誌添加到 logs 並限制總數不超過 200 條
-      logs.value.push(message);
-      if (logs.value.length > MAX_LOGS) {
-        logs.value.shift(); // 移除最早的一條日誌
-      }
-      // 確保 DOM 更新後滾動條移動到底部
-      nextTick(() => {
-        if (logContainer.value) {
-          logContainer.value.scrollTop = logContainer.value.scrollHeight;
-        }
-      });
-    }
-  };
-
-  websocket.onclose = () => {
-    console.log("WebSocket 連接已關閉，嘗試重新連接...");
-    reconnectWebSocket();
-  };
-
-  websocket.onerror = (error) => {
-    console.error("WebSocket 發生錯誤:", error);
-    websocket.close(); // 出現錯誤時關閉連接，並嘗試重連
-  };
-};
-
-// 嘗試重新連接 WebSocket 的函數
-const reconnectWebSocket = () => {
-  setTimeout(() => {
-    connectWebSocket(); // 重新建立 WebSocket 連接
-  }, reconnectInterval);
-};
-
 // 停止 Bot 的函數
 const stopBot = async () => {
-  isLoading.value = true; // 按下按鈕後，將 isLoading 設為 true
-
+  isLoading.value = true;
   try {
-    // 使用 axios 發送 PUT 請求
     await axios.put("/api/bot/tixcraft", { action: "stop" });
     console.log("腳本已停止");
+    await fetchStatus(); // 獲取當前狀態
   } catch (error) {
     console.error("停止腳本時發生錯誤:", error);
   } finally {
-    isLoading.value = false; // 不論請求成功或失敗，最終都將 isLoading 設為 false
+    isLoading.value = false;
   }
 };
 
-// 當組件掛載時，建立 WebSocket 連接
+// 新增函數來獲取當前狀態
+const fetchStatus = async () => {
+  try {
+    const response = await axios.get("/api/bot/tixcraft");
+    status.value = response.data.status; // 更新狀態
+  } catch (error) {
+    console.error("獲取狀態時發生錯誤:", error);
+  }
+};
+
+// 當組件掛載時，建立 WebSocket 連接並獲取狀態
 onMounted(() => {
-  connectWebSocket();
+  logWebSocket = connectWebSocket("/ws/logs", handleLogMessage); // 連接 log WebSocket
+  statusWebSocket = connectWebSocket("/ws/thread/status", handleStatusMessage); // 連接 status WebSocket
+  fetchStatus(); // 獲取當前狀態
 });
 
-// 當組件卸載時，關閉 WebSocket 連接
+// 當組件卸載時，關閉所有 WebSocket 連接
 onUnmounted(() => {
-  if (websocket) {
-    websocket.close();
+  if (logWebSocket) {
+    logWebSocket.close();
+  }
+  if (statusWebSocket) {
+    statusWebSocket.close();
   }
 });
 </script>

@@ -1,14 +1,15 @@
 import json
 import logging
-import multiprocessing
+import threading
 import re
 import traceback
 from logging.handlers import QueueHandler
+from venv import logger
 
 import ddddocr
 import requests
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchWindowException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -20,8 +21,8 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import CONFIG
-from type import BrowserDriver, Notify
-from utils import selenium_get_img, countdown, init_list
+from type import BrowserDriver, Notify, DummyEvent
+from utils import selenium_get_img, countdown, init_list, wait_if_paused
 
 
 class TicketSoldOutError(Exception):
@@ -31,15 +32,19 @@ class TicketSoldOutError(Exception):
 class Tixcraft(BrowserDriver):
     def __init__(
         self,
-        wait_event: multiprocessing.Event,
-        log_handler: logging.StreamHandler,
+        continue_event: threading.Event,
+        pause_flag: threading.Event,
+        end_flag: threading.Event,
+        logger: logging.Logger,
         event_url: str,
         session_index_list: list[int] = None,
         keyword_list: list[str] = None,
         requested_tickets: int = 1,
     ):
         super().__init__()
-        self.wait_event = wait_event
+        self.continue_event = continue_event
+        self.pause_flag = pause_flag
+        self.end_flag = end_flag
         self.event_url = event_url
         self.keyword_list = init_list(keyword_list)
         self.requested_tickets = requested_tickets
@@ -49,22 +54,17 @@ class Tixcraft(BrowserDriver):
         self.notify = Notify()
         self.LOGIN_URL = "https://tixcraft.com/login/google"
         self.CHECKOUT_URL = "https://tixcraft.com/ticket/checkout"
-        self.logger = self.__init_logger(log_handler)
-
-    def __init_logger(self, log_handler: logging.StreamHandler):
-        logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
-        logger.addHandler(log_handler)
-        return logger
+        self.logger = logger
 
     def login(self):
         if not CONFIG["AUTO_LOGIN"]:
             self.driver.get(self.event_url)
             self.logger.warning("confirm_login")
-            self.wait_event.wait()
-            self.wait_event.clear()
+            self.continue_event.wait()
+            self.continue_event.clear()
             return
 
+        self.logger.info("嘗試登入")
         self.driver.get(self.LOGIN_URL)
         WebDriverWait(self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]).until(
             lambda driver: driver.execute_script("return document.readyState")
@@ -79,6 +79,7 @@ class Tixcraft(BrowserDriver):
             EC.presence_of_element_located((By.CSS_SELECTOR, "#yDmH0d"))
         )
 
+        logger.info("自動選擇 Google 登入")
         login_button = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(
@@ -89,7 +90,6 @@ class Tixcraft(BrowserDriver):
                 )
             )
         )
-        self.logger.info("使用 Google 登入")
         login_button.click()
 
     def __fill_ticket_form(self):
@@ -105,14 +105,19 @@ class Tixcraft(BrowserDriver):
         ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#TicketForm_agree")))
         agree_checkbox.location_once_scrolled_into_view  # scroll into view
         agree_checkbox.click()
-        image = selenium_get_img(self.driver, "#TicketForm_verifyCode-image")
-        result = self.ocr.classification(image)
+
         verify_code_input = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "#TicketForm_verifyCode"))
         )
         verify_code_input.location_once_scrolled_into_view  # scroll into view
+        if not CONFIG["AUTO_INPUT_CAPTCHA"]:
+            self.driver.execute_script("arguments[0].focus();", verify_code_input)
+            return
+
+        image = selenium_get_img(self.driver, "#TicketForm_verifyCode-image")
+        result = self.ocr.classification(image)
         verify_code_input.send_keys(result)
         submit_button = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
@@ -137,14 +142,14 @@ class Tixcraft(BrowserDriver):
                     return False
                 if "已售完" in alert_text or "已無足夠" in alert_text:
                     raise TicketSoldOutError(alert_text)
-            except TicketSoldOutError as e:
-                raise e
             except TimeoutException:
                 pass
+            except TicketSoldOutError as e:
+                raise e
 
             current_url = self.driver.current_url
             if current_url == self.CHECKOUT_URL:
-                self.logger.info(f"頁面已跳轉至 {self.event_url}")
+                self.logger.info(f"頁面已跳轉至 {current_url}")
                 check_detail = WebDriverWait(
                     self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
                 ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#cartList")))
@@ -156,6 +161,7 @@ class Tixcraft(BrowserDriver):
 
     def fill_ticket_form(self):
         while True:
+            wait_if_paused(self.pause_flag, self.continue_event, self.logger)
             self.logger.info("填寫購票表單")
             self.__fill_ticket_form()
             if self.__get_form_result():
@@ -167,6 +173,8 @@ class Tixcraft(BrowserDriver):
         rows = soup.select("#gameList > table > tbody > tr")
         events = list()
         for row in rows:
+            if "目前無場次資訊" in row.text.strip():
+                return events
             cells = row.find_all("td")
             event = {
                 "performance_time": cells[0].get_text(strip=True),
@@ -215,14 +223,16 @@ class Tixcraft(BrowserDriver):
             return True
         return False
 
+    def __get_area_url_list(self, response_text) -> dict | None:
+        pattern = r"var areaUrlList = (\{.*?\});"
+        match = re.search(pattern, response_text, re.DOTALL)
+        if not match:
+            return None
+        return json.loads(match.group(1))
+
     def find_available_ticket(self, event_url: str) -> bool:
         self.logger.info(f"尋找 {event_url} 是否有可購票區域")
         response = requests.get(event_url)
-        pattern = r"var areaUrlList = (\{.*?\});"
-        match = re.search(pattern, response.text, re.DOTALL)
-        if not match:
-            return False
-        area_url_list = json.loads(match.group(1))
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.select('[id^="group_"] > li')
         for row in rows:
@@ -230,37 +240,33 @@ class Tixcraft(BrowserDriver):
             if self.__area_is_available_for_purchase(row_text):
                 match = re.search(r'a id="([^"]+)"', row_text)
                 id = match.group(1)
+                area_url_list = self.__get_area_url_list(response.text)
+                if not area_url_list:
+                    return False
                 self.driver.get(area_url_list[id])
                 self.logger.info(f"選購: {row.text}")
                 self.logger.info(f"購票連結: {area_url_list[id]}")
                 return True
         return False
 
-    def check_all_events_and_purchase_tickets(self):
-        for event_url in self.session_url_list:
+    def purchase_one_session(self, event_url: str) -> bool:
+        while True:
             if not self.find_available_ticket(event_url):
+                return False
+            try:
+                self.fill_ticket_form()
+                return True
+            except TicketSoldOutError as e:
+                self.logger.info(e)
                 continue
-
-            self.fill_ticket_form()
-            self.notify.send(
-                f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
-                CONFIG["TICKET_DETAIL_IMG_PATH"],
-            )
-            return True
-        return False
 
     def purchase(self):
         self.refresh_session_links()
+        wait_if_paused(self.pause_flag, self.continue_event, self.logger)
         for event_url in self.session_url_list:
-            if not self.find_available_ticket(event_url):
-                continue
-
-            self.fill_ticket_form()
-            self.notify.send(
-                f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
-                CONFIG["TICKET_DETAIL_IMG_PATH"],
-            )
-            return True
+            wait_if_paused(self.pause_flag, self.continue_event, self.logger)
+            if self.purchase_one_session(event_url):
+                return True
         return False
 
     def run(self):
@@ -275,40 +281,82 @@ class Tixcraft(BrowserDriver):
         while True:
             try:
                 if self.purchase():
+                    self.notify.send(
+                        f"{CONFIG["NOTIFY_PREFIX"]} {CONFIG["SUCCESS_MESSAGE"]}",
+                        CONFIG["TICKET_DETAIL_IMG_PATH"],
+                    )
                     break
                 else:
                     self.logger.info("無可購票區域，重新嘗試...")
+            except SystemExit as e:
+                raise e
+            except NoSuchWindowException:
+                self.logger.error("瀏覽器視窗已關閉，強制停止腳本")
+                return
             except Exception:
                 self.logger.error(traceback.format_exc())
-                if CONFIG["TRY_AGAIN_WHEN_ERROR"]:
-                    self.login()
-                else:
+                if not CONFIG["TRY_AGAIN_WHEN_ERROR"]:
                     break
         self.logger.info("腳本結束，等待手動關閉...")
-        self.wait_event.wait()
+        self.end_flag.set()
+        self.continue_event.wait()
 
+    def cleanup(self):
+        self.end_flag.clear()
+        self.pause_flag.clear()
+        self.continue_event.clear()
+        self.logger.info("關閉瀏覽器")
+        self.driver.quit()
 
-def main(log_queue=None, wait_event=None):
+def __get_logger(log_queue):
     if log_queue:
         log_handler = QueueHandler(log_queue)
     else:
         log_handler = logging.StreamHandler(sys.stdout)
 
-    if not wait_event:
-        wait_event = multiprocessing.Event()
-
     formatter = logging.Formatter("%(asctime)s - :%(levelname)s - %(message)s")
     log_handler.setFormatter(formatter)
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        handler.close()
+    logger.addHandler(log_handler)
+    return logger
 
-    ticket_bot = Tixcraft(
-        wait_event=wait_event,
-        log_handler=log_handler,
-        event_url=CONFIG["TIXCRAFT_EVENT_URL"],
-        session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
-        keyword_list=CONFIG["KEYWORD_LIST"],
-        requested_tickets=CONFIG["REQUEST_TICKETS"],
-    )
-    ticket_bot.run()
+def main(
+    continue_event: threading.Event = None,
+    pause_flag: threading.Event = None,
+    end_flag: threading.Event = None,
+    log_queue=None,
+):
+    print("Config id tixcraft:", id(CONFIG), CONFIG)
+
+    if not continue_event:
+        continue_event = DummyEvent()
+    if not pause_flag:
+        pause_flag = DummyEvent()
+    if not end_flag:
+        end_flag = DummyEvent()
+        
+    logger = __get_logger(log_queue)
+    try:
+        logger.info("開啟瀏覽器")
+        ticket_bot = Tixcraft(
+            continue_event=continue_event,
+            pause_flag=pause_flag,
+            end_flag=end_flag,
+            logger=logger,
+            event_url=CONFIG["TIXCRAFT_EVENT_URL"],
+            session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
+            keyword_list=CONFIG["KEYWORD_LIST"],
+            requested_tickets=CONFIG["REQUEST_TICKETS"],
+        )
+        ticket_bot.run()
+    except SystemExit:
+        logger.info("強制停止腳本")
+    ticket_bot.cleanup()
+    del ticket_bot
 
 
 if __name__ == "__main__":

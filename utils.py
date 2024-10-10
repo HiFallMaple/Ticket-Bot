@@ -1,5 +1,8 @@
+import ctypes
 import logging
 import os
+from re import S
+import threading
 import time
 import base64
 from datetime import datetime
@@ -9,7 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-def countdown(target_time: datetime, logger: logging.Logger) -> None:
+def countdown(target_time: datetime, logger: logging.Logger | None = None) -> None:
     """Countdown to a specified target time.
 
     Args:
@@ -19,6 +22,8 @@ def countdown(target_time: datetime, logger: logging.Logger) -> None:
     start_time = time.time()
     # Calculate the remaining time
     remaining_time = target_time.timestamp() - start_time
+    if logger is None:
+        logger = logging.getLogger(__name__)
 
     # Count down every 0.98 seconds until the remaining time is less than or equal to 1 second
     while remaining_time > 1:
@@ -89,3 +94,30 @@ def get_project_dir():
     """
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     return curr_dir
+
+
+def wait_if_paused(
+    pause_flag: threading.Event,
+    continue_event: threading.Event,
+    logger: logging.Logger | None = None,
+) -> None:
+    if pause_flag.is_set():
+        if logger is None:
+            logger = logging.getLogger(__name__)
+        logger.info("腳本暫停")
+        continue_event.wait()
+        continue_event.clear()
+        pause_flag.clear()
+        logger.info("腳本繼續")
+
+
+def raise_SystemExit_in_thread(thread: threading.Thread) -> None:
+    """Raise SystemExit in a thread.
+
+    Args:
+        thread (threading.Thread): The thread to raise SystemExit in.
+    """
+    thread_id = thread.ident
+    ctypes.pythonapi.PyThreadState_SetAsyncExc(
+        ctypes.c_long(thread_id), ctypes.py_object(SystemExit)
+    )

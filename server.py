@@ -2,42 +2,77 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from multiprocessing import Event, Process, Queue
+from threading import Event, Thread
+from queue import Queue
+import threading
+from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.websockets import WebSocketState
 
 from config import CONFIG, FRONTEND_PATH, get_stored_config, load_config, save_config
-from type import ActionRequest, BotStatus, ProgramStatusEnum, ConfigSchema, SessionInfo
+from type import (
+    ActionRequest,
+    BotStatus,
+    ProgramStatusEnum,
+    ConfigSchema,
+    SessionInfo,
+)
 import tixcraft
+from utils import raise_SystemExit_in_thread
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(send_logs())
+    task_logs = asyncio.create_task(send_logs())
+    task_status = asyncio.create_task(send_status())
     yield
-    task.cancel()
+    log_queue.put("END")
+    print("task_logs.cancel:", task_logs.cancel())
+    print("task_status.cancel:", task_status.cancel())
+    print("thread:", thread)
+    if thread:
+        raise_SystemExit_in_thread(thread)
 
 
 app = FastAPI(lifespan=lifespan)
-process = None
+thread = None
 # multiprocessing event
-wait_event = Event()
+continue_event = Event()
+pause_flag = Event()
+end_flag = Event()
 log_queue = Queue()
 
 # Store all connected WebSocket clients
-connected_websockets: list[WebSocket] = []
+logs_websockets: list[WebSocket] = []
+thread_status_websockets: list[WebSocket] = []
+
+
+async def get_thread_status() -> ProgramStatusEnum:
+    global thread
+    if thread and thread.is_alive():
+        if pause_flag.is_set():
+            return ProgramStatusEnum.PAUSED
+        if end_flag.is_set():
+            return ProgramStatusEnum.ENDED
+        return ProgramStatusEnum.RUNNING
+    else:
+        return ProgramStatusEnum.STOPPED
 
 
 async def send_logs():
     while True:
+        print("get logs")
         logs: logging.LogRecord = await asyncio.to_thread(
             log_queue.get
         )  # Get log messages from the queue
+        if logs == "END":
+            return
         logs: str = logs.getMessage()
+        print(logs)
         # Send logs to all connected WebSocket clients
-        for websocket in connected_websockets:
+        for websocket in logs_websockets:
             try:
                 await websocket.send_text(logs)
                 # await websocket.send_text("Event: confirm_login")
@@ -47,10 +82,21 @@ async def send_logs():
                 print(f"Error sending log to websocket: {e}")
 
 
+async def send_status():
+    while True:
+        status = await get_thread_status()
+        for websocket in thread_status_websockets:
+            try:
+                await websocket.send_text(status.value)
+            except Exception as e:
+                print(f"Error sending status to websocket: {e}")
+        await asyncio.sleep(0.5)
+
+
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
-    connected_websockets.append(websocket)  # Add to the connected list
+    logs_websockets.append(websocket)  # Add to the connected list
     try:
         while True:
             # Wait for the client to send any message to keep the connection alive
@@ -58,43 +104,81 @@ async def websocket_logs(websocket: WebSocket):
     except WebSocketDisconnect:
         print("WebSocket disconnected")
     finally:
-        connected_websockets.remove(websocket)  # Remove from the connected list
+        logs_websockets.remove(websocket)  # Remove from the connected list
         if not WebSocketState.DISCONNECTED:
             await websocket.close()  # Attempt to close the WebSocket
 
 
+@app.websocket("/ws/thread/status")
+async def websocket_thread_status(websocket: WebSocket):
+    await websocket.accept()
+    thread_status_websockets.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")
+    finally:
+        thread_status_websockets.remove(websocket)
+        if not WebSocketState.DISCONNECTED:
+            await websocket.close()
+
+
 @app.put("/api/bot/tixcraft", response_model=BotStatus)
 async def control_tixcraft_bot(action_request: ActionRequest):
-    global process, wait_event
-
+    global thread, continue_event, pause_flag, end_flag, log_queue
+    print("action_request:", action_request, thread)
+    if thread:
+        print("thread is alive:", thread.is_alive())
+    print("pause_flag.is_set():", pause_flag.is_set())
+    print("continue_event.is_set():", continue_event.is_set())
+    print("threading.enumerate()", threading.enumerate())
     if action_request.action == "run":
-        if not process or not process.is_alive():
-            process = Process(target=tixcraft.main, args=(log_queue, wait_event))
-            process.start()
+        if not thread or not thread.is_alive():
+            thread = Thread(
+                target=tixcraft.main,
+                args=(
+                    continue_event,
+                    pause_flag,
+                    end_flag,
+                    log_queue,
+                ),
+                daemon=True,
+            )
+            thread.start()
         return BotStatus(status=ProgramStatusEnum.RUNNING)
 
     elif action_request.action == "stop":
-        if process and process.is_alive():
-            process.terminate()
-            process.join()
+        if thread and thread.is_alive():
+            continue_event.set()
+            raise_SystemExit_in_thread(thread)
+            print("等待 thread.join")
+            thread.join()
+            print("thread.join 完成")
+            thread = None
         return BotStatus(status=ProgramStatusEnum.STOPPED)
-    
+
+    elif action_request.action == "pause":
+        print("pause_flag.is_set():", pause_flag.is_set())
+        print("continue_event.is_set():", continue_event.is_set())
+        if pause_flag.is_set():
+            return BotStatus(status=ProgramStatusEnum.PAUSED)
+        if thread and thread.is_alive():
+            print("pause_flag.set()")
+            pause_flag.set()
+        return BotStatus(status=ProgramStatusEnum.PAUSED)
+
     elif action_request.action == "continue":
-        if not process or not process.is_alive():
-            wait_event.set()
+        if thread and thread.is_alive():
+            continue_event.set()
             return BotStatus(status=ProgramStatusEnum.RUNNING)
         else:
             return BotStatus(status=ProgramStatusEnum.STOPPED)
 
 
-
 @app.get("/api/bot/tixcraft", response_model=BotStatus)
 async def get_tixcraft_status():
-    global process
-    if process and process.is_alive():
-        return BotStatus(status=ProgramStatusEnum.RUNNING)
-    else:
-        return BotStatus(status=ProgramStatusEnum.STOPPED)
+    return BotStatus(status=await get_thread_status())
 
 
 @app.get("/api/config", response_model=ConfigSchema)
@@ -109,12 +193,14 @@ async def update_config(config: ConfigSchema):
         if value is not None:
             CONFIG[key] = value
     save_config()
+    print("Config id /api/config:", id(CONFIG), CONFIG)
     return ConfigSchema(**get_stored_config())
 
 
 @app.get("/api/event/tixcraft", response_model=list[SessionInfo])
-async def get_tixcraft_event_info():
-    info = tixcraft.Tixcraft.get_session_info(CONFIG["TIXCRAFT_EVENT_URL"])
+async def get_tixcraft_event_info(event_url: Optional[str] = Query(None)):
+    url = event_url if event_url else CONFIG["TIXCRAFT_EVENT_URL"]
+    info = tixcraft.Tixcraft.get_session_info(url)
     for i, session in enumerate(info):
         session["id"] = i
     return info
@@ -126,7 +212,6 @@ async def catch_all(request: Request, full_path: str):
         full_path = "index.html"
     file_path = os.path.join(FRONTEND_PATH, full_path)
     if os.path.exists(file_path):
-        print("return file")
         return FileResponse(file_path)
     else:
         return HTMLResponse(content="404 Not Found", status_code=404)
