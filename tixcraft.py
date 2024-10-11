@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import threading
+from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
 
 import requests
@@ -28,6 +29,8 @@ class Tixcraft(Bot):
     def __init__(
         self,
         continue_event: threading.Event,
+        wait_login_flag: threading.Event,
+        wait_captcha_flag: threading.Event,
         pause_flag: threading.Event,
         end_flag: threading.Event,
         logger: logging.Logger,
@@ -38,6 +41,7 @@ class Tixcraft(Bot):
         session_index_list: list[int] = None,
         keyword_list: list[str] = None,
         auto_login: bool = False,
+        auto_input_captcha: bool = False,
         try_again_when_error: bool = False,
         notify_prefix: str = None,
         success_message: str = None,
@@ -46,6 +50,8 @@ class Tixcraft(Bot):
     ):
         super().__init__(
             continue_event=continue_event,
+            wait_login_flag=wait_login_flag,
+            wait_captcha_flag=wait_captcha_flag,
             pause_flag=pause_flag,
             end_flag=end_flag,
             logger=logger,
@@ -56,6 +62,7 @@ class Tixcraft(Bot):
             session_index_list=session_index_list,
             keyword_list=keyword_list,
             auto_login=auto_login,
+            auto_input_captcha=auto_input_captcha,
             try_again_when_error=try_again_when_error,
             notify_prefix=notify_prefix,
             success_message=success_message,
@@ -64,6 +71,26 @@ class Tixcraft(Bot):
         )
         self.LOGIN_URL = "https://tixcraft.com/login/google"
         self.CHECKOUT_URL = "https://tixcraft.com/ticket/checkout"
+
+    def check_cookie_banner(self):
+        current_time = datetime.now(timezone.utc)  # 获取当前 UTC 时间
+        expiration_time = current_time + timedelta(days=365)  # 设置过期时间为1年后
+        expiration_str = expiration_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")  # 格式化为类似于 '2024-10-11T10:34:16.080Z' 的格式
+
+        # 设置 Cookie
+        cookie = {
+            'name': 'OptanonAlertBoxClosed',
+            'value': '45',  # 你可以根据需要设置值
+            'domain': '.tixcraft.com',
+            'path': '/',
+            'secure': True,
+            'httpOnly': False,
+            'sameSite': 'Lax',
+            'expires': expiration_str  # 使用计算的过期时间
+        }
+
+        self.driver.add_cookie(cookie)
+        self.driver.refresh()
 
     def login(self):
         self.logger.info("嘗試登入")
@@ -93,8 +120,9 @@ class Tixcraft(Bot):
             )
         )
         login_button.click()
+        raise NotImplementedError
 
-    def __fill_ticket_form(self):
+    def _fill_ticket_form(self):
         self.driver.execute_script("document.body.style.zoom='70%'")
         ticket_num_selector = "[id^='TicketForm_ticketPrice_']"
         ticket_select = WebDriverWait(
@@ -114,8 +142,12 @@ class Tixcraft(Bot):
             EC.presence_of_element_located((By.CSS_SELECTOR, "#TicketForm_verifyCode"))
         )
         verify_code_input.location_once_scrolled_into_view  # scroll into view
-        if not CONFIG["AUTO_INPUT_CAPTCHA"]:
+        if not self.auto_input_captcha:
             self.driver.execute_script("arguments[0].focus();", verify_code_input)
+            self.wait_captcha_flag.set()
+            self.continue_event.wait()
+            self.continue_event.clear()
+            self.wait_captcha_flag.clear()
             return
 
         image = selenium_get_img(self.driver, "#TicketForm_verifyCode-image")
@@ -133,7 +165,7 @@ class Tixcraft(Bot):
         )
         submit_button.click()
 
-    def __get_form_result(self):
+    def _get_form_result(self):
         while True:
             try:
                 alert = WebDriverWait(self.driver, 0.5).until(EC.alert_is_present())
@@ -219,7 +251,6 @@ class Tixcraft(Bot):
         return json.loads(match.group(1))
 
     def find_available_ticket(self, event_url: str) -> bool:
-        self.logger.info(f"尋找 {event_url} 是否有可購票區域")
         response = requests.get(event_url)
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.select('[id^="group_"] > li')
@@ -257,6 +288,8 @@ def __get_logger(log_queue):
 
 def main(
     continue_event: threading.Event = None,
+    wait_login_flag: threading.Event = None,
+    wait_captcha_flag: threading.Event = None,
     pause_flag: threading.Event = None,
     end_flag: threading.Event = None,
     log_queue=None,
@@ -267,12 +300,18 @@ def main(
         pause_flag = DummyEvent()
     if not end_flag:
         end_flag = DummyEvent()
+    if not wait_login_flag:
+        wait_login_flag = DummyEvent()
+    if not wait_captcha_flag:
+        wait_captcha_flag = DummyEvent()
 
     logger = __get_logger(log_queue)
     try:
         logger.info("開啟瀏覽器")
         ticket_bot = Tixcraft(
             continue_event=continue_event,
+            wait_login_flag=wait_login_flag,
+            wait_captcha_flag=wait_captcha_flag,
             pause_flag=pause_flag,
             end_flag=end_flag,
             logger=logger,
@@ -283,6 +322,7 @@ def main(
             session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
             keyword_list=CONFIG["KEYWORD_LIST"],
             auto_login=CONFIG["AUTO_LOGIN"],
+            auto_input_captcha=CONFIG["AUTO_INPUT_CAPTCHA"],
             try_again_when_error=CONFIG["TRY_AGAIN_WHEN_ERROR"],
             notify_prefix=CONFIG["NOTIFY_PREFIX"],
             success_message=CONFIG["SUCCESS_MESSAGE"],

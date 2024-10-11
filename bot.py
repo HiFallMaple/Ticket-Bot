@@ -19,6 +19,8 @@ class Bot:
     def __init__(
         self,
         continue_event: threading.Event,
+        wait_login_flag: threading.Event,
+        wait_captcha_flag: threading.Event,
         pause_flag: threading.Event,
         end_flag: threading.Event,
         logger: logging.Logger,
@@ -29,6 +31,7 @@ class Bot:
         session_index_list: list[int] = None,
         keyword_list: list[str] = None,
         auto_login: bool = False,
+        auto_input_captcha: bool = False,
         try_again_when_error: bool = False,
         notify_prefix: str = None,
         success_message: str = None,
@@ -37,6 +40,8 @@ class Bot:
     ):
         super().__init__()
         self.continue_event = continue_event
+        self.wait_login_flag = wait_login_flag
+        self.wait_captcha_flag = wait_captcha_flag
         self.pause_flag = pause_flag
         self.end_flag = end_flag
         self.event_url = event_url
@@ -48,6 +53,7 @@ class Bot:
         self.try_again_when_error = try_again_when_error
         self.ticket_detail_img_path = ticket_detail_img_path
         self.auto_login = auto_login
+        self.auto_input_captcha = auto_input_captcha
         self.session_index_list = init_list(session_index_list)
         self.ocr = ddddocr.DdddOcr()
         self.notify = Notify()
@@ -57,24 +63,32 @@ class Bot:
         )
         self.logger = logger
         self.session_url_list = list()
+        
+    def __del__(self):
+        self.cleanup()
+        
+    def check_cookie_banner(self):
+        raise NotImplementedError
 
     def login(self):
         """Subclass should implement this method."""
         raise NotImplementedError
 
     def __login(self):
+        self.driver.get(self.event_url)
+        self.check_cookie_banner()
         if not self.auto_login:
-            self.driver.get(self.event_url)
-            self.logger.warning("confirm_login")
+            self.wait_login_flag.set()
             self.continue_event.wait()
             self.continue_event.clear()
+            self.wait_login_flag.clear()
             return
         self.login()
 
-    def __fill_ticket_form(self):
+    def _fill_ticket_form(self):
         raise NotImplementedError
 
-    def __get_form_result(self):
+    def _get_form_result(self):
         raise NotImplementedError
 
     def fill_ticket_form(self):
@@ -82,8 +96,8 @@ class Bot:
         while True:
             wait_if_paused(self.pause_flag, self.continue_event, self.logger)
             self.logger.info("填寫購票表單")
-            self.__fill_ticket_form()
-            if self.__get_form_result():
+            self._fill_ticket_form()
+            if self._get_form_result():
                 return
 
     def get_session_info(event_url) -> list:

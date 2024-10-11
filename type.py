@@ -69,6 +69,8 @@ class Notify:
 
 class ProgramStatusEnum(Enum):
     RUNNING = "running"
+    WATTING_LOGIN = "waiting_login"
+    WATTING_CAPTCHA = "waiting_captcha"
     PAUSED = "paused"
     ENDED = "ended"
     STOPPED = "stopped"

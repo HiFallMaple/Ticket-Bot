@@ -32,8 +32,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 thread = None
-# multiprocessing event
+# threading event
 continue_event = Event()
+wait_login_flag = Event()
+wait_captcha_flag = Event()
 pause_flag = Event()
 end_flag = Event()
 log_queue = Queue()
@@ -47,6 +49,10 @@ thread_status_websockets: list[WebSocket] = []
 async def get_thread_status() -> ProgramStatusEnum:
     global thread
     if thread and thread.is_alive():
+        if wait_login_flag.is_set():
+            return ProgramStatusEnum.WATTING_LOGIN
+        if wait_captcha_flag.is_set():
+            return ProgramStatusEnum.WATTING_CAPTCHA
         if pause_flag.is_set():
             return ProgramStatusEnum.PAUSED
         if end_flag.is_set():
@@ -130,6 +136,8 @@ async def control_tixcraft_bot(action_request: ActionRequest):
                 target=tixcraft.main,
                 args=(
                     continue_event,
+                    wait_login_flag,
+                    wait_captcha_flag,
                     pause_flag,
                     end_flag,
                     log_queue,

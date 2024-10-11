@@ -64,7 +64,7 @@
 
 <script setup>
 import Button from "primevue/button";
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
 import axios from "axios"; // 引入 axios
 import { useConfirm } from "primevue/useconfirm";
 import ConfirmDialog from "primevue/confirmdialog";
@@ -130,19 +130,15 @@ const reconnectWebSocket = (url, onMessageCallback) => {
 
 // log WebSocket 的回調
 const handleLogMessage = (message) => {
-  if (message.includes("WARNING - confirm_login")) {
-    confirmLogin();
-  } else {
-    logs.value.push(message);
-    if (logs.value.length > MAX_LOGS) {
-      logs.value.shift();
-    }
-    nextTick(() => {
-      if (logContainer.value) {
-        logContainer.value.scrollTop = logContainer.value.scrollHeight;
-      }
-    });
+  logs.value.push(message);
+  if (logs.value.length > MAX_LOGS) {
+    logs.value.shift();
   }
+  nextTick(() => {
+    if (logContainer.value) {
+      logContainer.value.scrollTop = logContainer.value.scrollHeight;
+    }
+  });
 };
 
 // status WebSocket 的回調
@@ -157,7 +153,6 @@ const confirmLogin = () => {
   confirm.require({
     group: "headless",
     message: "請登入後再按下確認繼續腳本",
-    header: "登入",
     icon: "pi pi-exclamation-triangle",
     acceptProps: {
       label: "繼續",
@@ -167,6 +162,28 @@ const confirmLogin = () => {
     },
   });
 };
+
+const confirmCaptcha = () => {
+  confirm.require({
+    group: "headless",
+    message: "請輸入驗證碼後再按下確認繼續腳本",
+    icon: "pi pi-exclamation-triangle",
+    acceptProps: {
+      label: "繼續",
+    },
+    accept: () => {
+      continueBot();
+    },
+  });
+};
+
+watch(status, (newStatus, oldStatus) => {
+  if (newStatus === "waiting_login") {
+    confirmLogin();
+  } else if (newStatus === "waiting_captcha") {
+    confirmCaptcha();
+  }
+});
 
 // 繼續 Bot
 const continueBot = async () => {
