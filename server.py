@@ -1,25 +1,19 @@
 import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
-from threading import Event, Thread
-from queue import Queue
 import threading
+from contextlib import asynccontextmanager
+from queue import Queue
+from threading import Event, Thread
 from typing import Optional
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.websockets import WebSocketState
 
-from config import CONFIG, FRONTEND_PATH, get_stored_config, load_config, save_config
-from type import (
-    ActionRequest,
-    BotStatus,
-    ProgramStatusEnum,
-    ConfigSchema,
-    SessionInfo,
-)
 import tixcraft
+from config import CONFIG, FRONTEND_PATH, get_stored_config, load_config, save_config
+from type import ActionRequest, BotStatus, ConfigSchema, ProgramStatusEnum, SessionInfo
 from utils import raise_SystemExit_in_thread
 
 

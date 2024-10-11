@@ -1,8 +1,10 @@
 import random
 import socket
-import webview
+from threading import Event, Thread
+
 import uvicorn
-from threading import Thread, Event
+import webview
+
 from server import app
 
 

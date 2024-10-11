@@ -6,7 +6,6 @@ from typing import Literal, Optional
 
 import requests
 from pydantic import BaseModel
-
 from telegram import Bot, InputFile
 from telegram.error import TelegramError
 

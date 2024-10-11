@@ -1,15 +1,16 @@
 import json
 import logging
-import threading
 import re
+import threading
 from logging.handlers import QueueHandler
 
 import requests
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import TimeoutException, NoSuchWindowException
+from selenium.common.exceptions import NoSuchWindowException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+
 
 # for embedding
 import sys
@@ -17,7 +18,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import CONFIG, CHROME_USER_DATA_PATH
+from config import CHROME_USER_DATA_PATH, CONFIG
 from bot import Bot
 from type import DummyEvent, TicketSoldOutError
 from utils import selenium_get_img

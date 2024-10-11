@@ -1,14 +1,14 @@
+import base64
 import ctypes
 import logging
 import os
 import threading
 import time
-import base64
 from datetime import datetime
 
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 import undetected_chromedriver as uc
 
 
