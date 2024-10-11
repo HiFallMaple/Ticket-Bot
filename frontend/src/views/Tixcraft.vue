@@ -132,7 +132,7 @@ onMounted(async () => {
     const config = response.data;
     REQUEST_TICKETS.value = config.REQUEST_TICKETS;
     TIXCRAFT_SESSION_INDEX_LIST.value = config.TIXCRAFT_SESSION_INDEX_LIST;
-    console.log("TIXCRAFT_SESSION_INDEX_LIST", TIXCRAFT_SESSION_INDEX_LIST.value);
+    console.log("___TIXCRAFT_SESSION_INDEX_LIST", TIXCRAFT_SESSION_INDEX_LIST.value);
     TIXCRAFT_EVENT_URL.value = config.TIXCRAFT_EVENT_URL;
     TARGET_TIME_STR.value = config.TARGET_TIME_STR;
     AUTO_LOGIN.value = config.AUTO_LOGIN;

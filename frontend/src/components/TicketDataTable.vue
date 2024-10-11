@@ -68,7 +68,6 @@ const onRowReorder = (event) => {
   updateSelectedIndex(sessions.value, selectedSession.value);
   console.log("Selected session IDs in new order:", selectedIndex);
 };
-watch(sessions, (newVal) => {});
 
 const updateSelectedIndex = (_sessions, _selectedSession) => {
   lock.value = true;
@@ -120,6 +119,13 @@ watch(selectedSession, (newVal) => {
   console.log("selectedSession changed", newVal);
   console.log("lock", lock.value);
   updateSelectedIndex(sessions.value, newVal);
+});
+
+watch(selectedIndex, (newVal) => {
+  if (lock.value) return;
+  console.log("selectedIndex changed", newVal);
+  console.log("lock", lock.value);
+  updateSelectedSession();
 });
 
 // 刷新數據的函數
