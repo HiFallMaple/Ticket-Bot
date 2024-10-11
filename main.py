@@ -24,8 +24,8 @@ def get_unused_port():
 
 if __name__ == "__main__":
     stop_event = Event()  # Create a stop event
-    # port = get_unused_port()  # Get an unused port
-    port = 8000
+    port = get_unused_port()  # Get an unused port
+    # port = 8000
     config = uvicorn.Config(app, host="localhost", port=port, lifespan="on")
     server = uvicorn.Server(config)
 

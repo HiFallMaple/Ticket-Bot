@@ -9,6 +9,7 @@ venv/
 *.jpg
 *.png
 .env
+chrome_user_data
 config.json
 build/
 dist/
@@ -16,8 +17,6 @@ dist/
 screenshots/
 main.build/
 main.dist/
-package/
 *.WebView2
 *.xml
 *.zip
-chrome_user_data

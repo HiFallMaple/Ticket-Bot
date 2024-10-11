@@ -43,6 +43,7 @@ continue_event = Event()
 pause_flag = Event()
 end_flag = Event()
 log_queue = Queue()
+logger = logging.getLogger(__name__)
 
 # Store all connected WebSocket clients
 logs_websockets: list[WebSocket] = []

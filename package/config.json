@@ -1,0 +1,24 @@
+{
+    "CHROME_PROFILE_DIR_PATH": "Profile",
+    "TARGET_TIME_STR": "2024/10/08 21:54:9.80",
+    "AUTO_LOGIN": true,
+    "AUTO_INPUT_CAPTCHA": true,
+    "NOTIFY_PREFIX": "Test",
+    "SUCCESS_MESSAGE": "已成功購票，請盡速付款",
+    "REQUEST_TICKETS": 3,
+    "KEYWORD_LIST": [
+        "5800",
+        "4500",
+        "3600",
+        "座位區"
+    ],
+    "TRY_AGAIN_WHEN_ERROR": false,
+    "TIXCRAFT_EVENT_URL": "https://tixcraft.com/activity/game/24_realive",
+    "TIXCRAFT_SESSION_INDEX_LIST": [
+        0,
+        1
+    ],
+    "TG_TOKEN": null,
+    "TG_CHAT_ID": null,
+    "LINE_NOTIFY_TOKEN": null
+}
