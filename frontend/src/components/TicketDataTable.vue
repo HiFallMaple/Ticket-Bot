@@ -2,6 +2,8 @@
   <DataTable
     v-model:selection="selectedSession"
     :value="sessions"
+    :reorderableColumns="true"
+    @rowReorder="onRowReorder"
     dataKey="id"
     tableStyle="min-width: 50rem"
     class="mb-4"
@@ -21,7 +23,7 @@
         />
       </div>
     </template>
-
+    <Column rowReorder headerStyle="width: 3rem" :reorderableColumn="false" />
     <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
     <Column field="performance_time" header="Performance Time"></Column>
     <Column field="event_name" header="Event Name"></Column>
@@ -52,11 +54,72 @@ const sessions = ref([]);
 const selectedSession = ref([]);
 const selectedIndex = defineModel("selectedIndex");
 const loading = ref(false); // 新增 loading 狀態
+const lock = ref(false);
 const props = defineProps({
   eventURL: {
     type: String,
     required: false,
   },
+});
+
+const onRowReorder = (event) => {
+  if (lock.value) return;
+  sessions.value = event.value;
+  updateSelectedIndex(sessions.value, selectedSession.value);
+  console.log("Selected session IDs in new order:", selectedIndex);
+};
+watch(sessions, (newVal) => {});
+
+const updateSelectedIndex = (_sessions, _selectedSession) => {
+  lock.value = true;
+  console.log("updateSelectedIndex");
+  console.log("_sessions", _sessions);
+  console.log("_selectedSession", _selectedSession);
+  selectedIndex.value.length = 0;
+  for (const session of _sessions) {
+    if (_selectedSession.includes(session)) {
+      selectedIndex.value.push(session.id);
+    }
+  }
+  console.log("selectedIndex", selectedIndex.value);
+  console.log("updateSelectedIndex end");
+  lock.value = false;
+};
+
+const updateSelectedSession = () => {
+  // 根據 selectedSessionIndex 的順序，從 sessions 中找出對應的 session
+  lock.value = true;
+  console.log("updateSelectedSession");
+  console.log("selectedIndex", selectedIndex.value);
+  const tmpSessions = [...sessions.value];
+  sessions.value.length = 0;
+  selectedSession.value.length = 0;
+  for (const index of selectedIndex.value) {
+    const session = tmpSessions.find((s) => s.id === index);
+    if (session) {
+      sessions.value.push(session);
+    }
+  }
+  selectedSession.value = selectedIndex.value
+    .map((index) => tmpSessions.find((s) => s.id === index))
+    .filter(Boolean);
+  // 把剩下沒有push進去的session加進去
+  for (const session of tmpSessions) {
+    if (!selectedSession.value.includes(session)) {
+      sessions.value.push(session);
+    }
+  }
+  console.log("selectedSession", selectedSession.value);
+  console.log("sessions", sessions.value);
+  console.log("updateSelectedSession end");
+  lock.value = false;
+};
+
+watch(selectedSession, (newVal) => {
+  if (lock.value) return;
+  console.log("selectedSession changed", newVal);
+  console.log("lock", lock.value);
+  updateSelectedIndex(sessions.value, newVal);
 });
 
 // 刷新數據的函數
@@ -79,40 +142,13 @@ const refreshData = async () => {
     console.error("Error fetching config:", error);
   } finally {
     loading.value = false; // 完成後設置 loading 為 false
+    updateSelectedSession();
   }
 };
 
 // 在組件加載時調用 refreshData 函數
 onMounted(async () => {
   await refreshData();
-  // 監視 selectedIndex 的變化
-  watch(selectedIndex, (newSelectedIndex) => {
-    console.log("selectedIndex changed:", newSelectedIndex);
-    const newSelectedSessions = newSelectedIndex
-      .map((id) => sessions.value.find((session) => session.id === id))
-      .filter(Boolean); // 過濾掉 undefined 的項目
-
-    // 只有當 selectedSession 發生變化時，才更新
-    if (
-      JSON.stringify(newSelectedSessions) !==
-      JSON.stringify(selectedSession.value)
-    ) {
-      selectedSession.value = newSelectedSessions;
-    }
-  });
-
-  // 當 selectedSession 更新時，自動更新 selectedIndex
-  watch(selectedSession, (newSelectedSession) => {
-    const newSelectedIndex = newSelectedSession.map((session) => session.id);
-    console.log("selectedSession changed:", newSelectedSession);
-    console.log("session", sessions.value);
-    // 只有當 selectedIndex 發生變化時，才更新
-    if (
-      JSON.stringify(newSelectedIndex) !== JSON.stringify(selectedIndex.value)
-    ) {
-      selectedIndex.value = newSelectedIndex;
-    }
-  });
 });
 </script>
 

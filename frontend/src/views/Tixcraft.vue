@@ -93,6 +93,7 @@ const saveData = async () => {
     !TIXCRAFT_SESSION_INDEX_LIST.value ||
     TIXCRAFT_SESSION_INDEX_LIST.value.length === 0
   ) {
+    console.log("TIXCRAFT_SESSION_INDEX_LIST.value", TIXCRAFT_SESSION_INDEX_LIST.value);
     toast.add({
       severity: "error",
       summary: "Error",
