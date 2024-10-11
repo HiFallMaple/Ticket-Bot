@@ -124,8 +124,6 @@ def raise_SystemExit_in_thread(thread: threading.Thread) -> None:
 
 
 def get_webdriver(user_data_dir: str = None, profile_dir: str = None):
-    print("user_data_dir:", user_data_dir)
-    print("profile_dir:", profile_dir)
     options = uc.ChromeOptions()
     if profile_dir:
         options.add_argument(f"--profile-directory={profile_dir}")

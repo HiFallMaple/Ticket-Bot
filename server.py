@@ -29,9 +29,9 @@ async def lifespan(app: FastAPI):
     task_status = asyncio.create_task(send_status())
     yield
     log_queue.put("END")
-    print("task_logs.cancel:", task_logs.cancel())
-    print("task_status.cancel:", task_status.cancel())
-    print("thread:", thread)
+    logger.info(f"send_logs.cancel: {task_logs.cancel()}")
+    logger.info(f"send_status.cancel: {task_status.cancel()}")
+    logger.info(f"thread: {thread}")
     if thread:
         raise_SystemExit_in_thread(thread)
 
@@ -43,7 +43,7 @@ continue_event = Event()
 pause_flag = Event()
 end_flag = Event()
 log_queue = Queue()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 # Store all connected WebSocket clients
 logs_websockets: list[WebSocket] = []
@@ -64,23 +64,19 @@ async def get_thread_status() -> ProgramStatusEnum:
 
 async def send_logs():
     while True:
-        print("get logs")
         logs: logging.LogRecord = await asyncio.to_thread(
             log_queue.get
         )  # Get log messages from the queue
         if logs == "END":
             return
         logs: str = logs.getMessage()
-        print(logs)
+        logger.debug("log from queue:", logs)
         # Send logs to all connected WebSocket clients
         for websocket in logs_websockets:
             try:
                 await websocket.send_text(logs)
-                # await websocket.send_text("Event: confirm_login")
-                # print("Event: confirm_login")
-                # await asyncio.sleep(5)
             except Exception as e:
-                print(f"Error sending log to websocket: {e}")
+                logger.warning(f"Error sending log to websocket: {e}")
 
 
 async def send_status():
@@ -90,7 +86,7 @@ async def send_status():
             try:
                 await websocket.send_text(status.value)
             except Exception as e:
-                print(f"Error sending status to websocket: {e}")
+                logger.warning(f"Error sending status to websocket: {e}")
         await asyncio.sleep(0.5)
 
 
@@ -103,7 +99,7 @@ async def websocket_logs(websocket: WebSocket):
             # Wait for the client to send any message to keep the connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        logger.info("WebSocket disconnected")
     finally:
         logs_websockets.remove(websocket)  # Remove from the connected list
         if not WebSocketState.DISCONNECTED:
@@ -118,7 +114,7 @@ async def websocket_thread_status(websocket: WebSocket):
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        logger.info("WebSocket disconnected")
     finally:
         thread_status_websockets.remove(websocket)
         if not WebSocketState.DISCONNECTED:
@@ -128,12 +124,12 @@ async def websocket_thread_status(websocket: WebSocket):
 @app.put("/api/bot/tixcraft", response_model=BotStatus)
 async def control_tixcraft_bot(action_request: ActionRequest):
     global thread, continue_event, pause_flag, end_flag, log_queue
-    print("action_request:", action_request, thread)
+    logger.info(f"action_request: {action_request}, thread: {thread}")
     if thread:
-        print("thread is alive:", thread.is_alive())
-    print("pause_flag.is_set():", pause_flag.is_set())
-    print("continue_event.is_set():", continue_event.is_set())
-    print("threading.enumerate()", threading.enumerate())
+        logger.info(f"thread is alive: {thread.is_alive()}")
+    logger.info(f"pause_flag.is_set(): {pause_flag.is_set()}")
+    logger.info(f"continue_event.is_set(): {continue_event.is_set()}")
+    logger.info(f"threading.enumerate() {threading.enumerate()}")
     if action_request.action == "run":
         if not thread or not thread.is_alive():
             thread = Thread(
@@ -153,19 +149,19 @@ async def control_tixcraft_bot(action_request: ActionRequest):
         if thread and thread.is_alive():
             continue_event.set()
             raise_SystemExit_in_thread(thread)
-            print("等待 thread.join")
+            logger.info("thread.join()")
             thread.join()
-            print("thread.join 完成")
+            logger.info("thread.join finished")
             thread = None
         return BotStatus(status=ProgramStatusEnum.STOPPED)
 
     elif action_request.action == "pause":
-        print("pause_flag.is_set():", pause_flag.is_set())
-        print("continue_event.is_set():", continue_event.is_set())
+        logger.info(f"pause_flag.is_set(): {pause_flag.is_set()}")
+        logger.info(f"continue_event.is_set(): {continue_event.is_set()}")
         if pause_flag.is_set():
             return BotStatus(status=ProgramStatusEnum.PAUSED)
         if thread and thread.is_alive():
-            print("pause_flag.set()")
+            logger.info("pause_flag.set()")
             pause_flag.set()
         return BotStatus(status=ProgramStatusEnum.PAUSED)
 
@@ -194,7 +190,6 @@ async def update_config(config: ConfigSchema):
         if value is not None:
             CONFIG[key] = value
     save_config()
-    print("Config id /api/config:", id(CONFIG), CONFIG)
     return ConfigSchema(**get_stored_config())
 
 
