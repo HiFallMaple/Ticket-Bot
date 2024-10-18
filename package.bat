@@ -8,9 +8,10 @@ pyinstaller .\main.py \
 --noconfirm \
 --name Ticket-Bot \
 --icon "icon.ico" \
---hidden-import=clr
+--hidden-import=clr \
+--hidden-import=clr_loader
 
-pyinstaller .\main.py --add-data "chrome_user_data;chrome_user_data" --add-data "frontend/dist;frontend/dist" --add-data "package/config.json;." --add-binary "venv\Lib\site-packages\ddddocr\common_old.onnx;ddddocr" --add-binary "venv\Lib\site-packages\onnxruntime\capi\onnxruntime_providers_shared.dll;onnxruntime\capi" --windowed --noconfirm --name Ticket-Bot --icon "icon.ico" --hidden-import=clr
+pyinstaller .\main.py --add-data "chrome_user_data;chrome_user_data" --add-data "frontend/dist;frontend/dist" --add-data "package/config.json;." --add-binary "venv\Lib\site-packages\ddddocr\common_old.onnx;ddddocr" --add-binary "venv\Lib\site-packages\onnxruntime\capi\onnxruntime_providers_shared.dll;onnxruntime\capi" --windowed --noconfirm --name Ticket-Bot --icon "icon.ico" --hidden-import=clr --hidden-import=clr_loader
 
 
 nuitka --standalone \

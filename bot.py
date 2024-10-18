@@ -1,5 +1,7 @@
 import logging
+import random
 import threading
+import time
 import traceback
 
 import ddddocr
@@ -27,6 +29,7 @@ class Bot:
         event_url: str,
         chrome_user_data_dir: str,
         chrome_profile_dir_path: str,
+        retry_delay: int = 5,
         requested_tickets: int = 1,
         session_index_list: list[int] = None,
         keyword_list: list[str] = None,
@@ -46,6 +49,7 @@ class Bot:
         self.end_flag = end_flag
         self.event_url = event_url
         self.keyword_list = init_list(keyword_list)
+        self.retry_delay = retry_delay
         self.requested_tickets = requested_tickets
         self.target_time = target_time
         self.notify_prefix = notify_prefix
@@ -169,6 +173,11 @@ class Bot:
                 self.logger.error(traceback.format_exc())
                 if not self.try_again_when_error:
                     break
+            # random delay retry_delay
+            random_delay = random.randint(0, self.retry_delay)
+            self.logger.info(f"等待 {random_delay} 秒後重試")
+            time.sleep(random_delay)
+            
         self.logger.info("腳本結束，等待手動關閉...")
         self.end_flag.set()
         self.continue_event.wait()

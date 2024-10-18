@@ -4,8 +4,6 @@ import re
 import threading
 from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
-from venv import logger
-from zoneinfo import available_timezones
 
 import requests
 from bs4 import BeautifulSoup
@@ -39,6 +37,7 @@ class Tixcraft(Bot):
         event_url: str,
         chrome_user_data_dir: str,
         chrome_profile_dir_path: str,
+        retry_delay: int = 5,
         requested_tickets: int = 1,
         session_index_list: list[int] = None,
         keyword_list: list[str] = None,
@@ -60,6 +59,7 @@ class Tixcraft(Bot):
             event_url=event_url,
             chrome_user_data_dir=chrome_user_data_dir,
             chrome_profile_dir_path=chrome_profile_dir_path,
+            retry_delay=retry_delay,
             requested_tickets=requested_tickets,
             session_index_list=session_index_list,
             keyword_list=keyword_list,
@@ -334,6 +334,7 @@ def main(
             event_url=CONFIG["TIXCRAFT_EVENT_URL"],
             chrome_user_data_dir=CHROME_USER_DATA_PATH,
             chrome_profile_dir_path=CONFIG["CHROME_PROFILE_DIR_PATH"],
+            retry_delay=CONFIG["RETRY_DELAY"],
             requested_tickets=CONFIG["REQUEST_TICKETS"],
             session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
             keyword_list=CONFIG["KEYWORD_LIST"],

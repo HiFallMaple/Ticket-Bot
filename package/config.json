@@ -5,6 +5,7 @@
     "AUTO_INPUT_CAPTCHA": true,
     "NOTIFY_PREFIX": "Test",
     "SUCCESS_MESSAGE": "已成功購票，請盡速付款",
+    "RETRY_DELAY": 10,
     "REQUEST_TICKETS": 3,
     "KEYWORD_LIST": [
         "5800",

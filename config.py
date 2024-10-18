@@ -13,6 +13,7 @@ STORE_KEY = [
     "AUTO_INPUT_CAPTCHA",
     "NOTIFY_PREFIX",
     "SUCCESS_MESSAGE",
+    "RETRY_DELAY",
     "REQUEST_TICKETS",
     "KEYWORD_LIST",
     "TRY_AGAIN_WHEN_ERROR",
@@ -37,6 +38,7 @@ class Config(TypedDict):
     TARGET_TIME_STR: str
     TARGET_TIME: datetime
     READY_TIME: str
+    RETRY_DELAY: int
     SCREENSHOT_DIR: str
     TICKET_DETAIL_IMG_PATH: str
     KEYWORD_LIST: list[str]
