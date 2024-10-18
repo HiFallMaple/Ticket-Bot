@@ -2,6 +2,7 @@
 import TicketDataTable from "@/components/TicketDataTable.vue";
 import LabelInputText from "@/components/LabelInputText.vue";
 import LabelToggleSwitch from "@/components/LabelToggleSwitch.vue"; // 引入新組件
+import StatusDialog from "@/components/StatusDialog.vue";
 import InputNumber from "primevue/inputnumber";
 import Divider from "primevue/divider";
 import Button from "primevue/button";
@@ -174,6 +175,7 @@ const comfirmToStart = () => {
 </script>
 
 <template>
+  <StatusDialog />
   <Toast />
   <ConfirmDialog group="headless">
     <template #container="{ message, acceptCallback, rejectCallback }">

@@ -3,15 +3,14 @@
     <Dialog v-model:visible="visible" :position="position">
       <template #container="{ closeCallback }">
         <div class="p-3 pt-4 px-4">
-          <span class="">機器人正在後台運行</span>
+          <p class="text-center w-full m-0">機器人正在後台運行</p>
           <div class="flex justify-content-center gap-2 mt-3">
             <Button
-              type="button"
-              :label="status === 'running' ? '暫停' : '繼續'"
-              severity="secondary"
-              @click="handleToggle"
-              :disabled="isLoading"
-            ></Button>
+              label="查看"
+              class="my-auto ml-2 no-underline"
+              as="router-link"
+              to="/log"
+            />
             <Button
               type="button"
               severity="danger"
@@ -37,17 +36,6 @@ const status = ref("stopped");
 const position = ref("bottomright");
 let websocket = null; // WebSocket 連接對象
 
-const handleToggle = async () => {
-  isLoading.value = true;
-  let action = status.value === "running" ? "pause" : "continue";
-  try {
-    await axios.put("/api/bot/tixcraft", { action: action });
-  } catch (error) {
-    console.error("切換腳本狀態時發生錯誤:", error);
-  } finally {
-    isLoading.value = false;
-  }
-};
 
 const connectWebSocket = () => {
   websocket = new WebSocket("ws://localhost:8000/ws/thread/status"); // 連接到你的 WebSocket 路徑
