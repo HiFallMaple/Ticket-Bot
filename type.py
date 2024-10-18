@@ -25,6 +25,9 @@ class Notify:
 
         if CONFIG["LINE_NOTIFY_TOKEN"]:
             self.send_method.append(self.line_notify_send)
+            
+    def need_notify(self) -> bool:
+        return bool(self.send_method)
 
     def send(self, message: str, image_path: str = None):
         if not os.path.exists(image_path):
