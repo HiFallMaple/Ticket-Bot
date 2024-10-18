@@ -133,7 +133,7 @@ def get_webdriver(user_data_dir: str = None, profile_dir: str = None):
     options.add_experimental_option("debuggerAddress", "127.0.0.1:9111")
     driver = uc.Chrome(
         user_data_dir=user_data_dir,
-        use_subprocess=False,
+        use_subprocess=True,
         options=options,
     )
     driver.maximize_window()
