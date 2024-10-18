@@ -90,12 +90,16 @@ class Bot:
 
     def _get_form_result(self):
         raise NotImplementedError
+    
+    def _screen_shot_ticket_detail(self):
+        raise NotImplementedError
 
-    def fill_ticket_form(self):
+    def fill_ticket_form(self, ticket_url: str):
         """Fill in the ticket form and check the result."""
         while True:
             wait_if_paused(self.pause_flag, self.continue_event, self.logger)
-            self.logger.info("填寫購票表單")
+            self.logger.info(f"填寫購票表單 {ticket_url}")
+            self.driver.get(ticket_url)
             self._fill_ticket_form()
             if self._get_form_result():
                 return
@@ -108,21 +112,20 @@ class Bot:
         """Get all session links from the event page and store them in session_url_list"""
         raise NotImplementedError
 
-    def find_available_ticket(self, session_url: str) -> bool:
+    def find_available_ticket(self, session_url: str) -> list:
         """Find available tickets in the session page."""
         raise NotImplementedError
 
     def purchase_session(self, session_url: str) -> bool:
-        while True:
-            self.logger.info(f"尋找 {session_url} 是否有可購票區域")
-            if not self.find_available_ticket(session_url):
-                return False
+        self.logger.info(f"尋找 {session_url} 是否有可購票區域")
+        for ticket_url in  self.find_available_ticket(session_url):
             try:
-                self.fill_ticket_form()
+                self.fill_ticket_form(ticket_url)
                 return True
             except TicketSoldOutError as e:
                 self.logger.info(e)
                 continue
+        return False
 
     def purchase(self):
         self.logger.info("更新場次購票連結")
@@ -147,6 +150,9 @@ class Bot:
         while True:
             try:
                 if self.purchase():
+                    if not self.notify.need_notify():
+                        break
+                    self._screen_shot_ticket_detail()
                     self.notify.send(
                         f"{self.notify_prefix} {self.success_message}",
                         self.ticket_detail_img_path,

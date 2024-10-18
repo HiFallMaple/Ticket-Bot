@@ -4,10 +4,12 @@ import re
 import threading
 from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
+from venv import logger
+from zoneinfo import available_timezones
 
 import requests
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import NoSuchWindowException, TimeoutException
+from selenium.common.exceptions import NoSuchWindowException, TimeoutException, UnexpectedAlertPresentException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -129,6 +131,7 @@ class Tixcraft(Bot):
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(EC.presence_of_element_located((By.CSS_SELECTOR, ticket_num_selector)))
         ticket_select.location_once_scrolled_into_view  # scroll into view
+        self.logger.info(f"選擇購票張數: {self.requested_tickets}")
         ticket_select.send_keys(str(self.requested_tickets))
         agree_checkbox = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
@@ -152,7 +155,9 @@ class Tixcraft(Bot):
 
         image = selenium_get_img(self.driver, "#TicketForm_verifyCode-image")
         result = self.ocr.classification(image)
+        self.logger.info(f"自動填入驗證碼: {result}")
         verify_code_input.send_keys(result)
+        self.logger.info("勾選同意條款")
         submit_button = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(
@@ -163,35 +168,46 @@ class Tixcraft(Bot):
                 )
             )
         )
+        self.logger.info("確認購票")
         submit_button.click()
+        
+    def _screen_shot_ticket_detail(self):
+        check_detail = WebDriverWait(
+            self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
+        ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#cartList")))
+        check_detail.location_once_scrolled_into_view  # scroll into view
+        self.logger.info("正在截圖購票結果，請稍候...")
+        os.makedirs(CONFIG["SCREENSHOT_DIR"], exist_ok=True)
+        check_detail.screenshot(CONFIG["TICKET_DETAIL_IMG_PATH"])
+    
 
     def _get_form_result(self):
         while True:
+            self.logger.info("等待購票結果")
+            alert_text = str()
             try:
                 alert = WebDriverWait(self.driver, 0.5).until(EC.alert_is_present())
                 alert_text = alert.text
                 alert.accept()
-                self.logger.warning("警報內容:", alert_text)
-                if "驗證碼" in alert_text:
-                    return False
-                if "已售完" in alert_text or "已無足夠" in alert_text:
-                    raise TicketSoldOutError(alert_text)
             except TimeoutException:
                 pass
             except TicketSoldOutError as e:
                 raise e
-
-            current_url = self.driver.current_url
-            if current_url == self.CHECKOUT_URL:
-                self.logger.info(f"頁面已跳轉至 {current_url}")
-                check_detail = WebDriverWait(
-                    self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
-                ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#cartList")))
-                check_detail.location_once_scrolled_into_view  # scroll into view
-                self.logger.info("正在截圖購票結果，請稍候...")
-                os.makedirs(CONFIG["SCREENSHOT_DIR"], exist_ok=True)
-                check_detail.screenshot(CONFIG["TICKET_DETAIL_IMG_PATH"])
-                return True
+            
+            try:
+                current_url = self.driver.current_url
+                if current_url == self.CHECKOUT_URL:
+                    self.logger.info(f"頁面已跳轉至 {current_url}")
+                    return True
+            except UnexpectedAlertPresentException as e:
+                alert_text = e.alert_text
+                
+            if alert_text:
+                self.logger.warning(f"警報內容: {alert_text}")
+                if "驗證碼" in alert_text:
+                    return False
+                if "已售完" in alert_text or "已無足夠" in alert_text:
+                    raise TicketSoldOutError(alert_text)
 
     def get_session_info(event_url):
         response = requests.get(event_url)
@@ -250,10 +266,11 @@ class Tixcraft(Bot):
             return None
         return json.loads(match.group(1))
 
-    def find_available_ticket(self, event_url: str) -> bool:
-        response = requests.get(event_url)
+    def find_available_ticket(self, session_url: str) -> bool:
+        response = requests.get(session_url)
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.select('[id^="group_"] > li')
+        available_url_list = list()
         for row in rows:
             row_text = str(row)
             if self.__area_is_available_for_purchase(row_text):
@@ -262,11 +279,10 @@ class Tixcraft(Bot):
                 area_url_list = self.__get_area_url_list(response.text)
                 if not area_url_list:
                     return False
-                self.driver.get(area_url_list[id])
-                self.logger.info(f"選購: {row.text}")
+                self.logger.info(f"可選購: {row.text}")
                 self.logger.info(f"購票連結: {area_url_list[id]}")
-                return True
-        return False
+                available_url_list.append(area_url_list[id])
+        return available_url_list
 
 
 def __get_logger(log_queue):
