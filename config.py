@@ -78,7 +78,7 @@ CONFIG = Config()
 load_config()
 
 
-CONFIG["SELENIUM_WAIT_TIMEOUT"] = 10
+CONFIG["SELENIUM_WAIT_TIMEOUT"] = 120
 CONFIG["TARGET_TIME"] = datetime.strptime(
     CONFIG["TARGET_TIME_STR"], "%Y/%m/%d %H:%M:%S.%f"
 )
