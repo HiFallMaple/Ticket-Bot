@@ -3,6 +3,7 @@ import random
 import threading
 import time
 import traceback
+from datetime import datetime
 
 import ddddocr
 from selenium.common.exceptions import NoSuchWindowException
@@ -13,6 +14,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from config import DATE_FORMAT
 from type import Notify, TicketSoldOutError
 from utils import countdown, init_list, wait_if_paused, get_webdriver
 
@@ -39,7 +41,7 @@ class Bot:
         notify_prefix: str = None,
         success_message: str = None,
         ticket_detail_img_path: str = None,
-        target_time: str = None,
+        target_time_str: str = None,
     ):
         super().__init__()
         self.continue_event = continue_event
@@ -51,7 +53,6 @@ class Bot:
         self.keyword_list = init_list(keyword_list)
         self.retry_delay = retry_delay
         self.requested_tickets = requested_tickets
-        self.target_time = target_time
         self.notify_prefix = notify_prefix
         self.success_message = success_message
         self.try_again_when_error = try_again_when_error
@@ -65,12 +66,13 @@ class Bot:
             user_data_dir=chrome_user_data_dir,
             profile_dir=chrome_profile_dir_path,
         )
+        self.target_time = datetime.strptime(target_time_str, DATE_FORMAT)
         self.logger = logger
         self.session_url_list = list()
-        
+
     def __del__(self):
         self.cleanup()
-        
+
     def check_cookie_banner(self):
         raise NotImplementedError
 
@@ -94,7 +96,7 @@ class Bot:
 
     def _get_form_result(self):
         raise NotImplementedError
-    
+
     def _screen_shot_ticket_detail(self):
         raise NotImplementedError
 
@@ -122,7 +124,7 @@ class Bot:
 
     def purchase_session(self, session_url: str) -> bool:
         self.logger.info(f"尋找 {session_url} 是否有可購票區域")
-        for ticket_url in  self.find_available_ticket(session_url):
+        for ticket_url in self.find_available_ticket(session_url):
             try:
                 self.fill_ticket_form(ticket_url)
                 return True
@@ -177,7 +179,7 @@ class Bot:
             random_delay = random.randint(0, self.retry_delay)
             self.logger.info(f"等待 {random_delay} 秒後重試")
             time.sleep(random_delay)
-            
+
         self.logger.info("腳本結束，等待手動關閉...")
         self.end_flag.set()
         self.continue_event.wait()

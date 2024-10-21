@@ -25,6 +25,8 @@ def countdown(target_time: datetime, logger: logging.Logger | None = None) -> No
     if logger is None:
         logger = logging.getLogger(__name__)
 
+    logger.debug(f"start_time:{start_time}, target_time:{target_time}, remaining_time:{remaining_time}")
+
     # Count down every 0.98 seconds until the remaining time is less than or equal to 1 second
     while remaining_time > 1:
         logger.info(f"Remaining time: {remaining_time:.2f} seconds")

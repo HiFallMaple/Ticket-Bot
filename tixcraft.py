@@ -47,7 +47,7 @@ class Tixcraft(Bot):
         notify_prefix: str = None,
         success_message: str = None,
         ticket_detail_img_path: str = None,
-        target_time: str = None,
+        target_time_str: str = None,
     ):
         super().__init__(
             continue_event=continue_event,
@@ -69,7 +69,7 @@ class Tixcraft(Bot):
             notify_prefix=notify_prefix,
             success_message=success_message,
             ticket_detail_img_path=ticket_detail_img_path,
-            target_time=target_time,
+            target_time_str=target_time_str,
         )
         self.LOGIN_URL = "https://tixcraft.com/login/google"
         self.CHECKOUT_URL = "https://tixcraft.com/ticket/checkout"
@@ -344,7 +344,7 @@ def main(
             notify_prefix=CONFIG["NOTIFY_PREFIX"],
             success_message=CONFIG["SUCCESS_MESSAGE"],
             ticket_detail_img_path=CONFIG["TICKET_DETAIL_IMG_PATH"],
-            target_time=CONFIG["TARGET_TIME"],
+            target_time_str=CONFIG["TARGET_TIME_STR"],
         )
         ticket_bot.run()
     except SystemExit:

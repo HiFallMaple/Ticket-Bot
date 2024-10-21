@@ -51,6 +51,7 @@ class Config(TypedDict):
 PROJ_DIR = get_project_dir()
 FRONTEND_PATH = os.path.join(PROJ_DIR, "frontend", "dist")
 CHROME_USER_DATA_PATH = os.path.join(PROJ_DIR, "chrome_user_data")
+DATE_FORMAT = "%Y/%m/%d %H:%M:%S.%f"
 
 def load_config():
     with open(CONFIG_JSON_PATH, "r", encoding="utf-8") as f:
