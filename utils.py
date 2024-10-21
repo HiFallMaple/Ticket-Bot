@@ -30,7 +30,6 @@ def countdown(target_time: datetime, logger: logging.Logger | None = None) -> No
     # Count down every 0.98 seconds until the remaining time is less than or equal to 1 second
     while remaining_time > 1:
         logger.info(f"Remaining time: {remaining_time:.2f} seconds")
-        print(f"Remaining time: {remaining_time:.2f} seconds")
         time.sleep(0.98)  # Sleep for 0.98 seconds before the next update
         remaining_time = target_time.timestamp() - time.time()
 
