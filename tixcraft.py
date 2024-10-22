@@ -251,9 +251,9 @@ class Tixcraft(Bot):
                 self.session_url_list.append(event_url)
                 self.logger.info("場次符合條件，已存入待搶清單")
 
-    def __area_is_available_for_purchase(self, row_text: str) -> bool:
+    def __area_is_available_for_purchase(self, row_text: str, keyword: str) -> bool:
         # check if the row contains any keyword
-        if not any(keyword in row_text for keyword in self.keyword_list):
+        if keyword not in row_text:
             return False
         # remaining seats
         match = re.search(r"(\d+)\s+seat\(s\)\s+remaining", row_text)
@@ -272,19 +272,23 @@ class Tixcraft(Bot):
             return None
         return json.loads(match.group(1))
 
-    def find_available_ticket(self, session_url: str) -> bool:
+    def find_available_ticket(self, session_url: str) -> list:
         response = requests.get(session_url)
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.select('[id^="group_"] > li')
+        match_rows = list()
+        for keyword in self.keyword_list:
+            for row in rows:
+                if self.__area_is_available_for_purchase(str(row), keyword) and row not in match_rows:
+                    match_rows.append(row)
         available_url_list = list()
-        for row in rows:
-            row_text = str(row)
-            if self.__area_is_available_for_purchase(row_text):
-                match = re.search(r'a id="([^"]+)"', row_text)
+        area_url_list = self.__get_area_url_list(response.text)
+        if not area_url_list:
+            return []
+        for row in match_rows:
+            match = re.search(r'a id="([^"]+)"', str(row))
+            if match:
                 id = match.group(1)
-                area_url_list = self.__get_area_url_list(response.text)
-                if not area_url_list:
-                    return False
                 self.logger.info(f"可選購: {row.text}")
                 self.logger.info(f"購票連結: {area_url_list[id]}")
                 available_url_list.append(area_url_list[id])
