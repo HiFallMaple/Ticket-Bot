@@ -10,7 +10,6 @@ import requests
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import (
     NoSuchWindowException,
-    TimeoutException,
     UnexpectedAlertPresentException,
 )
 from selenium.webdriver.common.by import By

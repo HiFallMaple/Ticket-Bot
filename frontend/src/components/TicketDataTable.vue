@@ -1,45 +1,58 @@
 <template>
-  <DataTable
-    v-model:selection="selectedSession"
-    :value="sessions"
-    :reorderableColumns="true"
-    @rowReorder="onRowReorder"
-    dataKey="id"
-    tableStyle="min-width: 50rem"
-    class="mb-4"
-  >
-    <template #header>
-      <div class="flex">
-        <div class="flex flex-wrap align-items-center gap-2">
-          <h3 class="-ml-2 my-0">欲搶購場次</h3>
+  <div>
+    <div class="flex">
+      <div class="flex flex-column justify-content-center">
+        <h3 class="ml-2 mt-2 mb-0">欲搶購場次</h3>
+        <small class="mb-2 ml-2" v-if="sessions.length == 0"
+          >按照要搶的場次編號輸入，編號從 0
+          開始，按照在表格中從上到下的順序，輸入後按 enter 確認</small
+        >
+      </div>
+      <Button
+        :icon="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'"
+        aria-label="Refresh"
+        @click="refreshData"
+        class="ml-auto my-auto"
+        text
+        style="height: 2.5rem"
+        :disabled="loading"
+      />
+    </div>
+    <Divider class="my-2" v-if="sessions.length > 0" />
+    <DataTable
+      v-if="sessions.length > 0"
+      v-model:selection="selectedSession"
+      :value="sessions"
+      :reorderableColumns="true"
+      @rowReorder="onRowReorder"
+      dataKey="id"
+      tableStyle="min-width: 50rem"
+      class="mb-4"
+    >
+      <Column rowReorder headerStyle="width: 3rem" :reorderableColumn="false" />
+      <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
+      <Column field="performance_time" header="Performance Time"></Column>
+      <Column field="event_name" header="Event Name"></Column>
+      <Column field="venue" header="Venue"></Column>
+      <template #footer>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            {{
+              sessions.length === 0
+                ? "目前無場次資訊"
+                : "已選擇 " + selectedIndex.length + " 場次"
+            }}
+          </span>
         </div>
-        <Button
-          :icon="loading ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'"
-          aria-label="Refresh"
-          @click="refreshData"
-          class="ml-auto"
-          text
-          :disabled="loading"
-        />
-      </div>
-    </template>
-    <Column rowReorder headerStyle="width: 3rem" :reorderableColumn="false" />
-    <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
-    <Column field="performance_time" header="Performance Time"></Column>
-    <Column field="event_name" header="Event Name"></Column>
-    <Column field="venue" header="Venue"></Column>
-    <template #footer>
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <span>
-          {{
-            sessions.length === 0
-              ? "目前無場次資訊"
-              : "已選擇 " + selectedIndex.length + " 場次"
-          }}
-        </span>
-      </div>
-    </template>
-  </DataTable>
+      </template>
+    </DataTable>
+    <TagInput
+      v-if="sessions.length == 0"
+      v-model="selectedIndex"
+      placeholder="0,1,3,2"
+      class="ml-2 mt-0"
+    />
+  </div>
 </template>
 
 <script setup>
@@ -47,6 +60,8 @@ import { ref, onMounted, watch } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Button from "primevue/button";
+import TagInput from "@/components/TagInput.vue";
+import Divider from "primevue/divider";
 import axios from "axios";
 
 // 定義變數
@@ -93,6 +108,10 @@ const updateSelectedSession = () => {
   const tmpSessions = [...sessions.value];
   sessions.value.length = 0;
   selectedSession.value.length = 0;
+  if (tmpSessions.length === 0) {
+    lock.value = false;
+    return;
+  }
   for (const index of selectedIndex.value) {
     const session = tmpSessions.find((s) => s.id === index);
     if (session) {
