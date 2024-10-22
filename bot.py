@@ -91,10 +91,10 @@ class Bot:
             return
         self.login()
 
-    def _fill_ticket_form(self):
+    def _fill_ticket_form(self, ticket_url: str):
         raise NotImplementedError
 
-    def _get_form_result(self):
+    def _get_form_result(self, ticket_url: str) -> bool:
         raise NotImplementedError
 
     def _screen_shot_ticket_detail(self):
@@ -106,8 +106,8 @@ class Bot:
             wait_if_paused(self.pause_flag, self.continue_event, self.logger)
             self.logger.info(f"填寫購票表單 {ticket_url}")
             self.driver.get(ticket_url)
-            self._fill_ticket_form()
-            if self._get_form_result():
+            self._fill_ticket_form(ticket_url)
+            if self._get_form_result(ticket_url):
                 return
 
     def get_session_info(event_url) -> list:

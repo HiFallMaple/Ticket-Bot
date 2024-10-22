@@ -2,12 +2,17 @@ import json
 import logging
 import re
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
 
 import requests
 from bs4 import BeautifulSoup
-from selenium.common.exceptions import NoSuchWindowException, TimeoutException, UnexpectedAlertPresentException
+from selenium.common.exceptions import (
+    NoSuchWindowException,
+    TimeoutException,
+    UnexpectedAlertPresentException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -77,18 +82,20 @@ class Tixcraft(Bot):
     def check_cookie_banner(self):
         current_time = datetime.now(timezone.utc)  # 获取当前 UTC 时间
         expiration_time = current_time + timedelta(days=365)  # 设置过期时间为1年后
-        expiration_str = expiration_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")  # 格式化为类似于 '2024-10-11T10:34:16.080Z' 的格式
+        expiration_str = expiration_time.strftime(
+            "%Y-%m-%dT%H:%M:%S.%fZ"
+        )  # 格式化为类似于 '2024-10-11T10:34:16.080Z' 的格式
 
         # 设置 Cookie
         cookie = {
-            'name': 'OptanonAlertBoxClosed',
-            'value': '45',  # 你可以根据需要设置值
-            'domain': '.tixcraft.com',
-            'path': '/',
-            'secure': True,
-            'httpOnly': False,
-            'sameSite': 'Lax',
-            'expires': expiration_str  # 使用计算的过期时间
+            "name": "OptanonAlertBoxClosed",
+            "value": "45",  # 你可以根据需要设置值
+            "domain": ".tixcraft.com",
+            "path": "/",
+            "secure": True,
+            "httpOnly": False,
+            "sameSite": "Lax",
+            "expires": expiration_str,  # 使用计算的过期时间
         }
 
         self.driver.add_cookie(cookie)
@@ -124,7 +131,7 @@ class Tixcraft(Bot):
         login_button.click()
         raise NotImplementedError
 
-    def _fill_ticket_form(self):
+    def _fill_ticket_form(self, ticket_url: str):
         self.driver.execute_script("document.body.style.zoom='70%'")
         ticket_num_selector = "[id^='TicketForm_ticketPrice_']"
         ticket_select = WebDriverWait(
@@ -133,11 +140,17 @@ class Tixcraft(Bot):
         ticket_select.location_once_scrolled_into_view  # scroll into view
         self.logger.info(f"選擇購票張數: {self.requested_tickets}")
         ticket_select.send_keys(str(self.requested_tickets))
+
+        self.logger.info("勾選同意條款")
         agree_checkbox = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#TicketForm_agree")))
-        agree_checkbox.location_once_scrolled_into_view  # scroll into view
-        agree_checkbox.click()
+        while not agree_checkbox.is_selected():
+            agree_checkbox.location_once_scrolled_into_view  # scroll into view
+            WebDriverWait(self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "#TicketForm_agree"))
+            )
+            agree_checkbox.click()
 
         verify_code_input = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
@@ -157,7 +170,6 @@ class Tixcraft(Bot):
         result = self.ocr.classification(image)
         self.logger.info(f"自動填入驗證碼: {result}")
         verify_code_input.send_keys(result)
-        self.logger.info("勾選同意條款")
         submit_button = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(
@@ -170,7 +182,7 @@ class Tixcraft(Bot):
         )
         self.logger.info("確認購票")
         submit_button.click()
-        
+
     def _screen_shot_ticket_detail(self):
         check_detail = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
@@ -179,35 +191,29 @@ class Tixcraft(Bot):
         self.logger.info("正在截圖購票結果，請稍候...")
         os.makedirs(CONFIG["SCREENSHOT_DIR"], exist_ok=True)
         check_detail.screenshot(CONFIG["TICKET_DETAIL_IMG_PATH"])
-    
 
-    def _get_form_result(self):
+    def _get_form_result(self, ticket_url: str) -> bool:
         while True:
             self.logger.info("等待購票結果")
             alert_text = str()
             try:
-                alert = WebDriverWait(self.driver, 0.5).until(EC.alert_is_present())
-                alert_text = alert.text
-                alert.accept()
-            except TimeoutException:
-                pass
-            except TicketSoldOutError as e:
-                raise e
-            
-            try:
                 current_url = self.driver.current_url
+                if current_url == ticket_url:
+                    self.logger.info("未如預期點擊購票，重新填寫表單")
+                    return False
                 if current_url == self.CHECKOUT_URL:
                     self.logger.info(f"頁面已跳轉至 {current_url}")
                     return True
             except UnexpectedAlertPresentException as e:
                 alert_text = e.alert_text
-                
+
             if alert_text:
                 self.logger.warning(f"警報內容: {alert_text}")
                 if "驗證碼" in alert_text:
                     return False
                 if "已售完" in alert_text or "已無足夠" in alert_text:
                     raise TicketSoldOutError(alert_text)
+            time.sleep(0.5)
 
     def get_session_info(event_url):
         response = requests.get(event_url)

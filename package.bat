@@ -1,35 +1,53 @@
-pyinstaller .\main.py \
---add-data "chrome_user_data_example;chrome_user_data" \
---add-data "frontend/dist;frontend/dist" \
---add-data "config.json.example;config.json" \
---add-binary "venv\Lib\site-packages\ddddocr\common_old.onnx;ddddocr" \
---add-binary "venv\Lib\site-packages\onnxruntime\capi\onnxruntime_providers_shared.dll;onnxruntime\capi" \
---windowed \
---noconfirm \
---name Ticket-Bot \
---icon "icon.ico" \
---hidden-import=clr \
---hidden-import=clr_loader
+@echo off
+setlocal
 
-pyinstaller .\main.py --add-data "chrome_user_data;chrome_user_data" --add-data "frontend/dist;frontend/dist" --add-data "package/config.json;." --add-binary "venv\Lib\site-packages\ddddocr\common_old.onnx;ddddocr" --add-binary "venv\Lib\site-packages\onnxruntime\capi\onnxruntime_providers_shared.dll;onnxruntime\capi" --windowed --noconfirm --name Ticket-Bot --icon "icon.ico" --hidden-import=clr --hidden-import=clr_loader
+REM 檢查是否有傳入參數
+if "%1"=="" (
+    echo 沒有提供參數，將執行所有操作。
+    set RUN_SRC=1
+    set RUN_EMBED=1
+) else (
+    if "%1"=="src" (
+        echo 只運行 Ticket-Bot-Src 的操作。
+        set RUN_SRC=1
+    ) else (
+        echo 無效的參數。
+        exit /b 1
+    )
+)
 
+REM Ticket-Bot-Src 操作
+if defined RUN_SRC (
+    robocopy . dist\Ticket-Bot-Src *.py /r:1 /w:1
+    robocopy frontend\dist dist\Ticket-Bot-Src\frontend\dist /e /r:1 /w:1
+    robocopy package dist\Ticket-Bot-Src *.bat /r:1 /w:1
 
-nuitka --standalone \
---windows-console-mode=disable \
---output-filename="Ticket-Bot" \
---windows-icon-from-ico=icon.ico \
---windows-company-name="FallMaple W.R" \
---windows-product-name="Ticket Bot" \
---windows-file-version=1.0.0 \
---windows-product-version=1.0.0 \
---windows-file-description="Automated ticket purchasing bot for platforms such as Tixcraft, KKTIX, and TicketPlus. This file is used to start the complete Python environment for the application." \
-main.py \
---force-stderr-spec='stderr.txt' \
---include-data-dir=frontend/dist/assets=frontend/dist/assets \
---include-data-dir=chrome_user_data_example=chrome_user_data \
---include-data-files=frontend/dist/index.html=frontend/dist/index.html \
---include-data-files=config.json.example=config.json \
---include-data-files=venv/Lib/site-packages/ddddocr/common_old.onnx=ddddocr/common_old.onnx \
---include-module=distutils
+    REM 刪除已存在的 Ticket-Bot-Src.7z 文件
+    if exist "dist\Ticket-Bot-Src.7z" (
+        del "dist\Ticket-Bot-Src.7z"
+    )
+    
+    REM 在 dist 目錄中打包 Ticket-Bot-Src 目錄
+    pushd dist
+    "C:\Program Files\7-Zip\7z.exe" a -t7z "Ticket-Bot-Src.7z" "Ticket-Bot-Src\*"
+    popd
+)
 
-nuitka --standalone --windows-console-mode=disable --output-filename="Ticket-Bot" --windows-icon-from-ico=icon.ico --windows-company-name="FallMaple W.R" --windows-product-name="Ticket Bot" --windows-file-version=1.0.0 --windows-product-version=1.0.0 --windows-file-description="Automated ticket purchasing bot for platforms such as Tixcraft, KKTIX, and TicketPlus. This file is used to start the complete Python environment for the application." .\main.py --force-stderr-spec='stderr.txt' --include-data-dir=frontend/dist/assets=frontend/dist/assets --include-data-dir=chrome_user_data_example=chrome_user_data --include-data-files=frontend/dist/index.html=frontend/dist/index.html --include-data-files=config.json.example=config.json --include-data-files=venv/Lib/site-packages/ddddocr/common_old.onnx=ddddocr/common_old.onnx --include-module=distutils
+REM Ticket-Bot-Embed 操作
+if defined RUN_EMBED (
+    robocopy . dist\Ticket-Bot-Embed *.py /r:1 /w:1
+    robocopy frontend\dist dist\Ticket-Bot-Embed\frontend\dist /e /r:1 /w:1
+    robocopy package dist\Ticket-Bot-Embed /e /r:1 /w:1
+
+    REM 刪除已存在的 Ticket-Bot-Embed.7z 文件
+    if exist "dist\Ticket-Bot-Embed.7z" (
+        del "dist\Ticket-Bot-Embed.7z"
+    )
+    
+    REM 在 dist 目錄中打包 Ticket-Bot-Embed 目錄
+    pushd dist
+    "C:\Program Files\7-Zip\7z.exe" a -t7z "Ticket-Bot-Embed.7z" "Ticket-Bot-Embed\*"
+    popd
+)
+
+endlocal
