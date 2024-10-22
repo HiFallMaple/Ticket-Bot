@@ -14,8 +14,7 @@ from selenium.common.exceptions import (
 )
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-
+from selenium.webdriver.support.ui import WebDriverWait, Select
 
 # for embedding
 import sys
@@ -136,6 +135,14 @@ class Tixcraft(Bot):
         ticket_select = WebDriverWait(
             self.driver, CONFIG["SELENIUM_WAIT_TIMEOUT"]
         ).until(EC.presence_of_element_located((By.CSS_SELECTOR, ticket_num_selector)))
+        has_enough_tickets = False
+        for option in Select(ticket_select).options:
+            if int(option.get_attribute("value")) >= self.requested_tickets:
+                has_enough_tickets = True
+                break
+        if not has_enough_tickets:
+            raise TicketSoldOutError("已無足夠票數")
+        
         ticket_select.location_once_scrolled_into_view  # scroll into view
         self.logger.info(f"選擇購票張數: {self.requested_tickets}")
         ticket_select.send_keys(str(self.requested_tickets))
@@ -207,7 +214,6 @@ class Tixcraft(Bot):
                 alert_text = e.alert_text
 
             if alert_text:
-                self.logger.warning(f"警報內容: {alert_text}")
                 if "驗證碼" in alert_text:
                     return False
                 if "已售完" in alert_text or "已無足夠" in alert_text:
@@ -278,7 +284,10 @@ class Tixcraft(Bot):
         match_rows = list()
         for keyword in self.keyword_list:
             for row in rows:
-                if self.__area_is_available_for_purchase(str(row), keyword) and row not in match_rows:
+                if (
+                    self.__area_is_available_for_purchase(str(row), keyword)
+                    and row not in match_rows
+                ):
                     match_rows.append(row)
         available_url_list = list()
         area_url_list = self.__get_area_url_list(response.text)

@@ -129,7 +129,7 @@ class Bot:
                 self.fill_ticket_form(ticket_url)
                 return True
             except TicketSoldOutError as e:
-                self.logger.info(e)
+                self.logger.warning(e)
                 continue
         return False
 
