@@ -34,7 +34,8 @@ class Bot:
         retry_delay: int = 5,
         requested_tickets: int = 1,
         session_index_list: list[int] = None,
-        keyword_list: list[str] = None,
+        positive_keyword_list: list[str] = None,
+        negative_keyword_list: list[str] = None,
         auto_login: bool = False,
         auto_input_captcha: bool = False,
         try_again_when_error: bool = False,
@@ -50,7 +51,8 @@ class Bot:
         self.pause_flag = pause_flag
         self.end_flag = end_flag
         self.event_url = event_url
-        self.keyword_list = init_list(keyword_list)
+        self.positive_keyword_list = init_list(positive_keyword_list)
+        self.negative_keyword_list = init_list(negative_keyword_list)
         self.retry_delay = retry_delay
         self.requested_tickets = requested_tickets
         self.notify_prefix = notify_prefix

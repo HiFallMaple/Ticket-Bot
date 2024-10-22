@@ -22,7 +22,8 @@ const router = useRouter(); // 使用 vue-router 跳轉
 
 const REQUEST_TICKETS = ref(null);
 const TIXCRAFT_SESSION_INDEX_LIST = ref([]); // 用於記錄選中的項目
-const KEYWORD_LIST = ref(""); // 記錄輸入的關鍵字
+const POSITIVE_KEYWORD_LIST = ref([]); // 記錄輸入的關鍵字
+const NEGATIVE_KEYWORD_LIST = ref([]); // 記錄輸入的關鍵字
 const TIXCRAFT_EVENT_URL = ref("");
 const TARGET_TIME_STR = ref(null);
 const AUTO_LOGIN = ref(false);
@@ -78,7 +79,7 @@ const saveData = async () => {
 
   if (
     !REQUEST_TICKETS.value ||
-    !KEYWORD_LIST.value ||
+    !POSITIVE_KEYWORD_LIST.value ||
     !TIXCRAFT_EVENT_URL.value ||
     !TARGET_TIME_STR.value
   ) {
@@ -111,7 +112,8 @@ const saveData = async () => {
   const config = {
     REQUEST_TICKETS: REQUEST_TICKETS.value,
     TIXCRAFT_SESSION_INDEX_LIST: TIXCRAFT_SESSION_INDEX_LIST.value,
-    KEYWORD_LIST: KEYWORD_LIST.value,
+    POSITIVE_KEYWORD_LIST: POSITIVE_KEYWORD_LIST.value,
+    NEGATIVE_KEYWORD_LIST: NEGATIVE_KEYWORD_LIST.value,
     AUTO_LOGIN: AUTO_LOGIN.value,
     TIXCRAFT_EVENT_URL: TIXCRAFT_EVENT_URL.value,
     TARGET_TIME_STR: TARGET_TIME_STR.value,
@@ -147,7 +149,8 @@ onMounted(async () => {
     TARGET_TIME_STR.value = config.TARGET_TIME_STR;
     AUTO_LOGIN.value = config.AUTO_LOGIN;
     AUTO_INPUT_CAPTCHA.value = config.AUTO_INPUT_CAPTCHA;
-    KEYWORD_LIST.value = config.KEYWORD_LIST;
+    POSITIVE_KEYWORD_LIST.value = config.POSITIVE_KEYWORD_LIST;
+    NEGATIVE_KEYWORD_LIST.value = config.NEGATIVE_KEYWORD_LIST;
 
     target_time.value = new Date(config.TARGET_TIME_STR.substring(0, 16));
     target_time_s.value = parseInt(
@@ -296,10 +299,18 @@ const comfirmToStart = () => {
         </div>
         <div class="col-6"></div>
         <LabelTagInput
-          v-model="KEYWORD_LIST"
+          v-model="POSITIVE_KEYWORD_LIST"
           label="搶購的關鍵字"
           placeholder="1F,3080,5505"
-          inputId="keywords_list"
+          inputId="positive_keywords_list"
+          class="col-6"
+        />
+        <div class="col-fixed"></div>
+        <LabelTagInput
+          v-model="NEGATIVE_KEYWORD_LIST"
+          label="排除的關鍵字"
+          placeholder="身障,輪椅,殘障,視線遮蔽區"
+          inputId="negative_keywords_list"
           class="col-6"
         />
         <div class="col-fixed"></div>

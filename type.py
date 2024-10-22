@@ -97,7 +97,8 @@ class ConfigSchema(BaseModel):
     TG_CHAT_ID: Optional[int] = None
     LINE_NOTIFY_TOKEN: Optional[str] = None
     TARGET_TIME_STR: Optional[str] = None
-    KEYWORD_LIST: Optional[list[str]] = None
+    POSITIVE_KEYWORD_LIST: Optional[list[str]] = None
+    NEGATIVE_KEYWORD_LIST: Optional[list[str]] = None
     REQUEST_TICKETS: Optional[int] = None
     TRY_AGAIN_WHEN_ERROR: Optional[bool] = None
     TIXCRAFT_EVENT_URL: Optional[str] = None

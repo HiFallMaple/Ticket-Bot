@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
 
+from numpy import negative
 import requests
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import (
@@ -43,7 +44,8 @@ class Tixcraft(Bot):
         retry_delay: int = 5,
         requested_tickets: int = 1,
         session_index_list: list[int] = None,
-        keyword_list: list[str] = None,
+        positive_keyword_list: list[str] = None,
+        negative_keyword_list: list[str] = None,
         auto_login: bool = False,
         auto_input_captcha: bool = False,
         try_again_when_error: bool = False,
@@ -65,7 +67,8 @@ class Tixcraft(Bot):
             retry_delay=retry_delay,
             requested_tickets=requested_tickets,
             session_index_list=session_index_list,
-            keyword_list=keyword_list,
+            positive_keyword_list=positive_keyword_list,
+            negative_keyword_list=negative_keyword_list,
             auto_login=auto_login,
             auto_input_captcha=auto_input_captcha,
             try_again_when_error=try_again_when_error,
@@ -260,6 +263,9 @@ class Tixcraft(Bot):
         # check if the row contains any keyword
         if keyword not in row_text:
             return False
+        for negative_keyword in self.negative_keyword_list:
+            if negative_keyword in row_text:
+                return False
         # remaining seats
         match = re.search(r"(\d+)\s+seat\(s\)\s+remaining", row_text)
         if match:
@@ -282,7 +288,7 @@ class Tixcraft(Bot):
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.select('[id^="group_"] > li')
         match_rows = list()
-        for keyword in self.keyword_list:
+        for keyword in self.positive_keyword_list:
             for row in rows:
                 if (
                     self.__area_is_available_for_purchase(str(row), keyword)
@@ -355,7 +361,8 @@ def main(
             retry_delay=CONFIG["RETRY_DELAY"],
             requested_tickets=CONFIG["REQUEST_TICKETS"],
             session_index_list=CONFIG["TIXCRAFT_SESSION_INDEX_LIST"],
-            keyword_list=CONFIG["KEYWORD_LIST"],
+            positive_keyword_list=CONFIG["POSITIVE_KEYWORD_LIST"],
+            negative_keyword_list=CONFIG["NEGATIVE_KEYWORD_LIST"],
             auto_login=CONFIG["AUTO_LOGIN"],
             auto_input_captcha=CONFIG["AUTO_INPUT_CAPTCHA"],
             try_again_when_error=CONFIG["TRY_AGAIN_WHEN_ERROR"],

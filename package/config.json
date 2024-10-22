@@ -7,11 +7,17 @@
     "SUCCESS_MESSAGE": "已成功購票，請盡速付款",
     "RETRY_DELAY": 10,
     "REQUEST_TICKETS": 3,
-    "KEYWORD_LIST": [
+    "POSITIVE_KEYWORD_LIST": [
         "5800",
         "4500",
         "3600",
         "座位區"
+    ],
+    "NEGATIVE_KEYWORD_LIST": [
+        "身障",
+        "殘障",
+        "輪椅",
+        "視線遮蔽"
     ],
     "TRY_AGAIN_WHEN_ERROR": false,
     "TIXCRAFT_EVENT_URL": "https://tixcraft.com/activity/game/24_realive",
