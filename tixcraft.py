@@ -6,7 +6,6 @@ import time
 from datetime import datetime, timedelta, timezone
 from logging.handlers import QueueHandler
 
-from numpy import negative
 import requests
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import (
