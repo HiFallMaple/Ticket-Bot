@@ -102,10 +102,10 @@ class Bot:
 
     def fill_ticket_form(self, ticket_url: str):
         """Fill in the ticket form and check the result."""
+        self.driver.get(ticket_url)
         while True:
             wait_if_paused(self.pause_flag, self.continue_event, self.logger)
             self.logger.info(f"填寫購票表單 {ticket_url}")
-            self.driver.get(ticket_url)
             self._fill_ticket_form(ticket_url)
             if self._get_form_result(ticket_url):
                 return
